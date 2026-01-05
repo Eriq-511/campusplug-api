@@ -22,6 +22,9 @@ spring:
     enabled: true
 
 management:
+  health:
+    redis:
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:true}
   endpoints:
     web:
       exposure:
