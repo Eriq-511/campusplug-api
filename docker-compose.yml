@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: campusplug-postgis
+    environment:
+      POSTGRES_DB: campusplug
+      POSTGRES_USER: campusplug
+      POSTGRES_PASSWORD: campusplug
+    ports:
+      - "5432:5432"
+    volumes:
+      - campusplug_db:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: campusplug-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  campusplug_db:
