@@ -22,17 +22,24 @@
 
 ### User identity rules
 - **University email domain restriction:** YES
-  - Allowed domains: `must.ac.ug`, `students.must.ac.ug`
+  - Allowed domains: `must.ac.ug`, `std.must.ac.ug`
 - `registrationNumber`: mandatory and user-entered, must match UI format:
   - Canonical: `YYYY/PROGRAM/NNN` with optional `/PS`
   - Example: `2023/BIT/216/PS` or `2023/BIT/216`
   - Accept input with or without separators; normalize to canonical form
 
 ### Location / Geo (PostGIS)
+- **Decision:** Use **PostGIS** for geo features (nearby listings, distance sorting, radius filtering).
+  - Mobile app will send `lat`/`lng`; backend stores them as a PostGIS point for fast spatial queries.
+  - **No manual DB steps on Render**: PostGIS is enabled via Flyway migration on startup.
 - User “registered location” must store: **label + lat/lng**
 - Listing location supports:
   - `useRegisteredLocation=true` → copy user registered location (label + point)
   - else alternate `locationText` + **lat/lng** (recommended for consistent nearby results)
+- Storage strategy (MVP):
+  - Store `location_text` for UI display
+  - Store `geo` as `geography(Point, 4326)` for PostGIS queries
+  - (Optional) also store `lat`/`lng` as numeric fields for debugging/interop, but queries should use `geo`
 
 ### Email verification
 - **Optional** in MVP (not required to post or message)
@@ -157,7 +164,8 @@ Goal: reduce database load and improve perceived speed, while ensuring the app d
 - `SPRING_PROFILES_ACTIVE=prod`
 - `DATABASE_URL=<Render Internal Database URL>`
 - `JWT_SECRET=<base64 or random 64+ bytes>`
-- `APP_AUTH_ALLOWED_EMAIL_DOMAINS=must.ac.ug,students.must.ac.ug`
+- `APP_AUTH_ALLOWED_EMAIL_DOMAINS=must.ac.ug,std.must.ac.ug`
+- `APP_FRONTEND_BASE_URL=<where reset-password links should send users (temporary: https://campusplug-api.onrender.com)>`
 
 **Datasource note:** Spring Boot expects JDBC (`jdbc:postgresql://...`). If Render provides `DATABASE_URL=postgresql://...`, the app must either (A) convert it at startup or (B) set `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` instead.
 
@@ -424,7 +432,7 @@ This section turns the UI into explicit backend requirements.
 
 **Deliverables**
 - Flyway migrations:
-  - `CREATE EXTENSION IF NOT EXISTS postgis;`
+  - `CREATE EXTENSION IF NOT EXISTS postgis;` (**required; runs automatically on startup—no Render console steps**)
   - tables: users, listings, listing_images, bookmarks, conversations, messages
 - Listing location columns:
   - `location_text` (string shown in UI)
@@ -637,7 +645,7 @@ This section turns the UI into explicit backend requirements.
 - ✅ WS works when service is awake; fallback works when sleeping
 - ✅ Deploy is repeatable: new Render environment starts cleanly with Flyway (no manual DB setup)
 
----
+--- 
 
 ## 4) Definition of Done (portfolio-ready MVP)
 - Deployed on Render with public URL
@@ -648,3 +656,48 @@ This section turns the UI into explicit backend requirements.
   - bookmark + list bookmarks
   - start conversation + send messages (WS + fallback)
 - CI runs tests; DB migrations reproducible
+
+## Current codebase baseline (from `pom.xml`)
+**Runtime / platform**
+- Java: **17**
+- Spring Boot parent: **3.5.9**
+- Build tool: **Maven**
+
+**API & docs**
+- REST: `spring-boot-starter-web`
+- Validation: `spring-boot-starter-validation`
+- OpenAPI/Swagger UI: `springdoc-openapi-starter-webmvc-ui` (**2.8.5**)
+
+**Security**
+- Spring Security: `spring-boot-starter-security`
+  - Note: default auto-config may generate a dev password unless replaced by our JWT setup (Phase 1).
+
+**Database**
+- JPA/Hibernate: `spring-boot-starter-data-jpa`
+- PostgreSQL driver: `org.postgresql:postgresql` (runtime)
+
+**Migrations (no manual setup)**
+- Flyway is already included:
+  - `org.flywaydb:flyway-core`
+  - `org.flywaydb:flyway-database-postgresql` (runtime)
+- Implication: DB schema must be managed via SQL migrations in:
+  - `src/main/resources/db/migration`
+- Render deploys should apply migrations automatically on app startup.
+
+**Caching / rate-limit storage**
+- Redis client: `spring-boot-starter-data-redis`
+  - Implication: we can use Redis for refresh-token/session revocation, rate limiting, caching.
+
+**Realtime**
+- WebSocket support: `spring-boot-starter-websocket`
+
+**Observability**
+- Actuator: `spring-boot-starter-actuator` (health/readiness/liveness)
+
+**Testing**
+- Spring Boot test: `spring-boot-starter-test`
+- Spring Security test: `spring-security-test`
+- Testcontainers BOM: **1.20.4**
+  - `testcontainers:junit-jupiter`
+  - `testcontainers:postgresql`
+- Implication: integration tests can run against real Postgres in CI.
