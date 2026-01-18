@@ -2,6 +2,11 @@
 
 Spring Boot backend for the CampusPlug marketplace.
 
+## Project guardrails (don’t drift)
+- Source of truth: `planning.md`
+- Phase gate checklist: `checklist.md` (must be checked off before moving to the next phase)
+- Phase reflection log: `reflector.md` (append an entry at the end of every completed phase)
+
 ## Requirements
 - Java 17
 - Docker Desktop (optional, for local PostGIS/Redis)

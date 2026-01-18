@@ -399,6 +399,7 @@ This section turns the UI into explicit backend requirements.
 ## 3) Implementation phases (technical requirements + testing criteria)
 
 ### Phase 1 — Project bootstrap + CI + local dev
+**Phase done rule:** meet all testing criteria, then append a Phase 1 entry to `reflector.md`.
 **Goal:** runnable Spring Boot app + PostGIS locally + CI pipeline.
 
 **Deliverables**
@@ -428,6 +429,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 2 — Schema + migrations (PostGIS enabled)
+**Phase done rule:** meet all testing criteria, then append a Phase 2 entry to `reflector.md`.
 **Goal:** DB schema aligned to UI features.
 
 **Deliverables**
@@ -452,6 +454,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 3 — Auth (domain restriction + long JWT + revocation + rate limiting)
+**Phase done rule:** meet all testing criteria, then append a Phase 3 entry to `reflector.md`.
 **Goal:** match login UI + secure session invalidation.
 
 **Deliverables**
@@ -459,6 +462,14 @@ This section turns the UI into explicit backend requirements.
   - register/login/logout
   - forgot/reset password
   - verify/resend email (optional feature; verification itself is optional in MVP)
+- Security config cleanup (removes current Render warning from `UserDetailsServiceAutoConfiguration`):
+  - Replace bootstrap `permitAll` config with a **stateless JWT** security setup.
+  - Disable interactive auth mechanisms (`formLogin`, `httpBasic`) so Spring does not create a default dev user.
+  - Keep these endpoints public:
+    - `GET /` (root)
+    - `GET /actuator/health`
+    - `POST /api/v1/auth/*` (register/login/forgot/reset)
+  - Require a valid JWT for all other endpoints.
 - Domain restriction: `allowed-email-domains`
 - Registration number validation:
   - accept `2023/BIT/216/PS` and `2023BIT216PS`
@@ -489,10 +500,12 @@ This section turns the UI into explicit backend requirements.
 - ✅ duplicate registrationNumber rejected (409)
 - ✅ logout rejects revoked token
 - ✅ rate limit triggers return 429
+- ✅ prod startup logs do **not** show a generated dev password warning (`UserDetailsServiceAutoConfiguration`)
 
 ---
 
 ### Phase 4 — Users (profile + registered location)
+**Phase done rule:** meet all testing criteria, then append a Phase 4 entry to `reflector.md`.
 **Goal:** support profile screen.
 
 **Deliverables**
@@ -507,6 +520,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 5 — Listings + My Listings actions
+**Phase done rule:** meet all testing criteria, then append a Phase 5 entry to `reflector.md`.
 **Goal:** implement "Sell" + "My Listings" UI.
 
 **Deliverables**
@@ -531,6 +545,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 6 — Images (Cloudinary direct upload) up to 10
+**Phase done rule:** meet all testing criteria, then append a Phase 6 entry to `reflector.md`.
 **Goal:** match "Add up to 10 photos" UI.
 
 **Deliverables**
@@ -545,6 +560,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 7 — Categories + Search + Nearby (PostGIS)
+**Phase done rule:** meet all testing criteria, then append a Phase 7 entry to `reflector.md`.
 **Goal:** match categories + search bar + distance UI.
 
 **Deliverables**
@@ -566,6 +582,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 8 — Bookmarks (Saved Items UI)
+**Phase done rule:** meet all testing criteria, then append a Phase 8 entry to `reflector.md`.
 **Goal:** saved items list + remove + chat action.
 
 **Deliverables**
@@ -579,6 +596,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 9 — Messaging (WebSocket + polling fallback + presence)
+**Phase done rule:** meet all testing criteria, then append a Phase 9 entry to `reflector.md`.
 **Goal:** match Messages UI + chat view.
 
 **Deliverables**
@@ -613,6 +631,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 10 — Observability + hardening
+**Phase done rule:** meet all testing criteria, then append a Phase 10 entry to `reflector.md`.
 **Goal:** production readiness on free tier.
 
 **Deliverables**
@@ -630,6 +649,7 @@ This section turns the UI into explicit backend requirements.
 ---
 
 ### Phase 11 — Deploy to Render (Free)
+**Phase done rule:** meet all testing criteria, then append a Phase 11 entry to `reflector.md`.
 **Goal:** public online URL.
 
 **Deliverables**
@@ -670,7 +690,7 @@ This section turns the UI into explicit backend requirements.
 
 **Security**
 - Spring Security: `spring-boot-starter-security`
-  - Note: default auto-config may generate a dev password unless replaced by our JWT setup (Phase 1).
+  - Note: default auto-config may generate a dev password unless replaced by our JWT setup (Phase 3).
 
 **Database**
 - JPA/Hibernate: `spring-boot-starter-data-jpa`
@@ -701,3 +721,63 @@ This section turns the UI into explicit backend requirements.
   - `testcontainers:junit-jupiter`
   - `testcontainers:postgresql`
 - Implication: integration tests can run against real Postgres in CI.
+
+### Push notifications (FCM) — New listings (mobile OS notifications)
+**Goal:** notify users of new ACTIVE listings even when the app is closed.
+
+**Provider**
+- Firebase Cloud Messaging (FCM)
+
+**Setup (infra)**
+- Firebase project created
+- Backend uses Firebase Admin via a service account JSON stored as Render env var:
+  - `FCM_SERVICE_ACCOUNT_B64` (Base64 of service account JSON)
+  - optional: `FCM_ENABLED=true`
+
+**Device registration**
+- Endpoint: `POST /api/v1/push/register` (JWT required)
+  - body: `{ "token": "<fcmToken>", "platform": "android|ios", "campus": "<optional>" }`
+  - store per-user tokens (or rely on topic subscriptions)
+
+**Delivery strategy (recommended)**
+- Use FCM topics by campus:
+  - `campus_{campus}` (campus normalized lowercase)
+- App subscribes to `campus_{userCampus}`.
+- On listing transition to `ACTIVE`, backend sends push to that topic.
+
+**Acceptance criteria**
+- ✅ creating an ACTIVE listing triggers exactly one push to the correct campus topic
+- ✅ secrets are not logged and are not committed to git
+- ✅ feature can be disabled via env flag without code changes
+
+## Code organization (mandatory)
+
+## Execution guardrail (mandatory)
+To prevent implementation drift, every completed phase must end with an update to:
+- `reflector.md` (append a “Phase Reflection” entry)
+
+Phase work must be checked off in:
+- `checklist.md` (phase gate checklist mirroring Deliverables + Testing criteria)
+
+Each reflection must explicitly compare the phase’s **Deliverables** + **Testing criteria** against what was actually implemented.
+If anything deviates, update `planning.md` to match (this file is the source of truth).
+
+**Root package:** `com.campusplug.api`
+
+**Rule:** organize by **feature** (vertical slicing), not only by layer.
+
+**Enforcement:** all Java classes/interfaces must declare packages starting with `com.campusplug.api.*` (no other base packages).
+
+**Required package layout (guideline)**
+- `com.campusplug.api.common` (shared errors/validation/utilities)
+- `com.campusplug.api.config` (app config: CORS, OpenAPI, Jackson)
+- `com.campusplug.api.security` (JWT, Spring Security config, rate limiting)
+- Feature modules:
+  - `com.campusplug.api.auth`
+  - `com.campusplug.api.users`
+  - `com.campusplug.api.listings`
+  - `com.campusplug.api.bookmarks`
+  - `com.campusplug.api.messaging`
+  - `com.campusplug.api.push`
+
+**Constraint:** the `@SpringBootApplication` class must be in `com.campusplug.api` to ensure component scanning covers all subpackages.
