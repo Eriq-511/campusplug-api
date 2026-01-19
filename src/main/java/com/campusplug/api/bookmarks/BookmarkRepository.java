@@ -1,0 +1,83 @@
+package com.campusplug.api.bookmarks;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.Instant;
+import java.util.Optional;
+
+public interface BookmarkRepository extends JpaRepository<BookmarkEntity, BookmarkId> {
+
+    interface BookmarkListingProjection {
+        Long getListingId();
+
+        String getTitle();
+
+        Long getPriceUgx();
+
+        String getCurrency();
+
+        String getCategoryCode();
+
+        String getLocationText();
+
+        String getCampus();
+
+        String getStatus();
+
+        Instant getListingCreatedAt();
+
+        Instant getBookmarkedAt();
+    }
+
+    @Query(
+            value = """
+                select
+                  b.listing_id as listingId,
+                  l.title as title,
+                  l.price_ugx as priceUgx,
+                  l.currency as currency,
+                  l.category_code as categoryCode,
+                  l.location_text as locationText,
+                  l.campus as campus,
+                  l.status::text as status,
+                  l.created_at as listingCreatedAt,
+                  b.created_at as bookmarkedAt
+                from bookmarks b
+                join listings l on l.id = b.listing_id
+                where b.user_id = :userId
+                order by b.created_at desc
+                """,
+            countQuery = """
+                select count(*)
+                from bookmarks b
+                where b.user_id = :userId
+                """,
+            nativeQuery = true
+    )
+    Page<BookmarkListingProjection> findBookmarks(@Param("userId") Long userId, Pageable pageable);
+
+    @Query(
+            value = """
+                select
+                  b.listing_id as listingId,
+                  l.title as title,
+                  l.price_ugx as priceUgx,
+                  l.currency as currency,
+                  l.category_code as categoryCode,
+                  l.location_text as locationText,
+                  l.campus as campus,
+                  l.status::text as status,
+                  l.created_at as listingCreatedAt,
+                  b.created_at as bookmarkedAt
+                from bookmarks b
+                join listings l on l.id = b.listing_id
+                where b.user_id = :userId and b.listing_id = :listingId
+                """,
+            nativeQuery = true
+    )
+    Optional<BookmarkListingProjection> findBookmark(@Param("userId") Long userId, @Param("listingId") Long listingId);
+}

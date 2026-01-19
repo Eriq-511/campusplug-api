@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD009 MD022 MD032 MD035 MD036 MD047 -->
+
 # CampusPlug Backend (Spring Boot) — Implementation Plan (UI-aligned)
 
 > Scope: mobile MVP backend API for a university marketplace (Listings, Users/Auth, Bookmarks, Search, Real-time Messaging) deployable on **Render Free** with **PostgreSQL + PostGIS**.
@@ -88,6 +90,42 @@ Goal: push **new product/listing alerts** to mobile clients in real time.
   - forgot-password: **3/hr per email + 3/hr per IP**
   - register: **3/hr per IP**
 
+### Exception handling & debugging (must-have across ALL phases)
+Goal: make failures easy to diagnose locally and safe in production.
+
+**Global exception handling**
+- Implement a single global exception handler using `@RestControllerAdvice`.
+- All API errors should return a consistent JSON shape (use the project’s standard error DTO).
+
+**Standard error response shape (JSON)**
+- `timestamp` (ISO-8601)
+- `status` (HTTP status code)
+- `error` (status text)
+- `code` (stable machine-readable error code; do not change casually)
+- `message` (human-readable summary)
+- `path` (request path)
+- `fieldErrors` (optional map of field -> message for validation errors)
+
+**How to raise errors (implementation rule)**
+- For business/domain errors (e.g., SOLD messaging block, not owner, invalid state), throw a typed API exception that carries:
+  - HTTP status
+  - stable error `code`
+  - user-safe message
+- For validation errors, rely on Bean Validation and ensure field-level errors are returned.
+
+**What must be handled explicitly (minimum)**
+- Validation errors (`400` + `VALIDATION_ERROR` + `fieldErrors`)
+- Malformed JSON (`400` + `MALFORMED_JSON`)
+- Constraint/duplicate errors (`409` + stable code where possible)
+- Unauthorized vs forbidden (`401` vs `403`) with clear behavior
+- Rate limiting (`429` + `RATE_LIMITED`)
+- Catch-all unexpected errors (`500` + `INTERNAL_ERROR`)
+
+**Logging (debuggability without leaking secrets)**
+- Unexpected exceptions must be logged server-side with stack trace.
+- Do not return stack traces or internal exception messages to clients (especially in prod).
+- Prefer logging context like HTTP method + path + user id (if available) + correlation id.
+
 ### Smart caching (avoid stale mobile data)
 Goal: reduce database load and improve perceived speed, while ensuring the app does not see outdated data for long.
 
@@ -108,15 +146,15 @@ Goal: reduce database load and improve perceived speed, while ensuring the app d
 **Cache keys / namespaces (Redis)**
 - Prefix all keys with: `campusplug:cache:`
 - Categories:
-  - `campusplug:cache:categories:v1`
+  - `campusplug:cache:categories:v2`
 - Listing detail:
   - `campusplug:cache:listing:v1:{listingId}`
 - Feed (include query params that affect results):
   - `campusplug:cache:feed:v1:{campus}:{page}:{size}`
   - If additional filters are added later, append a stable hash: `...:{filtersHash}`
 - Search / Nearby (too many combinations; always key by normalized query + hash):
-  - `campusplug:cache:search:v1:{queryHash}:{page}:{size}`
-  - `campusplug:cache:nearby:v1:{queryHash}:{page}:{size}`
+  - `campusplug:cache:search:v2:{queryHash}:{page}:{size}`
+  - `campusplug:cache:nearby:v2:{queryHash}:{page}:{size}`
 - (Optional) Bookmarks list (if cached):
   - `campusplug:cache:bookmarks:v1:{userId}:{page}:{size}`
 
@@ -128,10 +166,10 @@ Goal: reduce database load and improve perceived speed, while ensuring the app d
 - On listing mutation (create/update/delete/restore/sold/images):
   - delete `campusplug:cache:listing:v1:{listingId}`
   - delete `campusplug:cache:feed:v1:*`
-  - delete `campusplug:cache:search:v1:*`
-  - delete `campusplug:cache:nearby:v1:*`
+  - delete `campusplug:cache:search:v2:*`
+  - delete `campusplug:cache:nearby:v2:*`
 - On category-affecting changes (listing create/delete/status change):
-  - delete `campusplug:cache:categories:v1`
+  - delete `campusplug:cache:categories:v2`
 - On bookmark add/remove (if bookmarks list cached):
   - delete `campusplug:cache:bookmarks:v1:{userId}:*`
 

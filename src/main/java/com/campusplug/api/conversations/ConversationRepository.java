@@ -1,0 +1,81 @@
+package com.campusplug.api.conversations;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.Optional;
+
+public interface ConversationRepository extends JpaRepository<ConversationEntity, Long> {
+
+    Optional<ConversationEntity> findByListingIdAndBuyerUserIdAndSellerUserId(Long listingId, Long buyerUserId, Long sellerUserId);
+
+    interface ConversationListItemProjection {
+        Long getId();
+
+        Long getListingId();
+
+        String getListingTitle();
+
+        Long getCounterpartUserId();
+
+        String getCounterpartFullName();
+
+        String getLastMessageBody();
+
+        Instant getLastMessageAt();
+    }
+
+    @Query(
+            value = """
+                select
+                  c.id as id,
+                  c.listing_id as listingId,
+                  l.title as listingTitle,
+                  case when c.buyer_user_id = :userId then c.seller_user_id else c.buyer_user_id end as counterpartUserId,
+                  u.full_name as counterpartFullName,
+                  m.body as lastMessageBody,
+                  m.created_at as lastMessageAt
+                from conversations c
+                join listings l on l.id = c.listing_id
+                join users u on u.id = (case when c.buyer_user_id = :userId then c.seller_user_id else c.buyer_user_id end)
+                left join lateral (
+                  select body, created_at
+                  from messages
+                  where conversation_id = c.id
+                  order by id desc
+                  limit 1
+                ) m on true
+                where c.buyer_user_id = :userId or c.seller_user_id = :userId
+                order by coalesce(m.created_at, c.updated_at) desc, c.id desc
+                """,
+            countQuery = """
+                select count(*)
+                from conversations c
+                where c.buyer_user_id = :userId or c.seller_user_id = :userId
+                """,
+            nativeQuery = true
+    )
+    Page<ConversationListItemProjection> findConversationList(@Param("userId") Long userId, Pageable pageable);
+
+    @Query(
+            value = """
+                select c.*
+                from conversations c
+                where c.id = :conversationId
+                  and (c.buyer_user_id = :userId or c.seller_user_id = :userId)
+                """,
+            nativeQuery = true
+    )
+    Optional<ConversationEntity> findParticipantConversation(@Param("conversationId") Long conversationId, @Param("userId") Long userId);
+
+    @Transactional
+    @Modifying
+    @Query(value = "update conversations set updated_at = now() where id = :conversationId", nativeQuery = true)
+    int touchUpdatedAt(@Param("conversationId") Long conversationId);
+}

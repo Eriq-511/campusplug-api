@@ -1,0 +1,159 @@
+package com.campusplug.api.listings.browse;
+
+import com.campusplug.api.cache.CacheConfig;
+import com.campusplug.api.common.ApiException;
+import com.campusplug.api.listings.ListingRepository;
+import com.campusplug.api.listings.images.ListingImageEntity;
+import com.campusplug.api.listings.images.ListingImageRepository;
+import com.campusplug.api.listings.browse.dto.ListingCardResponse;
+import com.campusplug.api.listings.browse.dto.ListingPageResponse;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+public class ListingBrowseService {
+
+    private final ListingRepository listingRepository;
+    private final ListingImageRepository listingImageRepository;
+
+    public ListingBrowseService(ListingRepository listingRepository, ListingImageRepository listingImageRepository) {
+        this.listingRepository = listingRepository;
+        this.listingImageRepository = listingImageRepository;
+    }
+
+    @Cacheable(cacheNames = CacheConfig.SEARCH_CACHE, keyGenerator = "searchKeyGenerator")
+    public ListingPageResponse search(
+            String query,
+            String categoryCode,
+            String campus,
+            Long minPriceUgx,
+            Long maxPriceUgx,
+            int page,
+            int size) {
+
+        String q = normalizeQuery(query);
+        Pageable pageable = PageRequest.of(clampPage(page), clampSize(size));
+
+        Page<ListingRepository.ListingCardProjection> result = listingRepository.searchActive(
+                q,
+                trimToNull(categoryCode),
+                normalizeCampus(campus),
+                minPriceUgx,
+                maxPriceUgx,
+                pageable
+        );
+
+        return toPageResponse(result, pageable);
+    }
+
+    @Cacheable(cacheNames = CacheConfig.NEARBY_CACHE, keyGenerator = "nearbyKeyGenerator")
+    public ListingPageResponse nearby(
+            double lat,
+            double lng,
+            double radiusKm,
+            String categoryCode,
+            String campus,
+            int page,
+            int size) {
+
+        if (radiusKm <= 0 || radiusKm > 200) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_RADIUS", "radiusKm must be between 0 and 200");
+        }
+
+        double radiusMeters = radiusKm * 1000.0;
+        Pageable pageable = PageRequest.of(clampPage(page), clampSize(size));
+
+        Page<ListingRepository.ListingCardProjection> result = listingRepository.nearbyActive(
+                lat,
+                lng,
+                radiusMeters,
+                trimToNull(categoryCode),
+                normalizeCampus(campus),
+                pageable
+        );
+
+        return toPageResponse(result, pageable);
+    }
+
+    private ListingPageResponse toPageResponse(Page<ListingRepository.ListingCardProjection> page, Pageable pageable) {
+        List<Long> ids = page.getContent().stream()
+            .map(ListingRepository.ListingCardProjection::getId)
+            .collect(Collectors.toList());
+        Map<Long, String> primaryImageByListingId = loadPrimaryImages(ids);
+
+        List<ListingCardResponse> items = page.getContent().stream()
+                .map(r -> new ListingCardResponse(
+                        r.getId(),
+                        r.getTitle(),
+                        r.getPriceUgx(),
+                        r.getCurrency(),
+                        r.getCategoryCode(),
+                        r.getLocationText(),
+                        r.getCampus(),
+                        primaryImageByListingId.get(r.getId()),
+                        r.getCreatedAt(),
+                        r.getDistanceMeters()
+                ))
+                    .collect(Collectors.toList());
+
+        return new ListingPageResponse(items, pageable.getPageNumber(), pageable.getPageSize(), page.getTotalElements());
+    }
+
+    private Map<Long, String> loadPrimaryImages(List<Long> listingIds) {
+        if (listingIds == null || listingIds.isEmpty()) {
+            return Map.of();
+        }
+        List<ListingImageEntity> entities = listingImageRepository.findByListingIdInOrderByListingIdAscCreatedAtAsc(listingIds);
+        Map<Long, String> primary = new HashMap<>();
+        for (ListingImageEntity e : entities) {
+            primary.putIfAbsent(e.getListingId(), e.getSecureUrl());
+        }
+        return primary;
+    }
+
+    private static int clampPage(int page) {
+        return Math.max(0, page);
+    }
+
+    private static int clampSize(int size) {
+        int s = size <= 0 ? 20 : size;
+        return Math.min(s, 100);
+    }
+
+    private static String normalizeQuery(String query) {
+        String q = trimToNull(query);
+        if (q == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "query must not be blank");
+        }
+        return q;
+    }
+
+    private static String normalizeCampus(String campus) {
+        if (campus == null) {
+            return null;
+        }
+        String trimmed = campus.trim();
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        return trimmed.toLowerCase(Locale.ROOT);
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        return t.isBlank() ? null : t;
+    }
+}

@@ -1,0 +1,424 @@
+{
+  "info": {
+    "_postman_id": "8a2f1e2b-8f2b-4d3c-b2b2-0f3d9f25c3c1",
+    "name": "CampusPlug API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/"
+          }
+        },
+        {
+          "name": "Actuator Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "Actuator Info (requires JWT)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/actuator/info"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"2026/BIT/123\",\n  \"email\": \"testuser123@must.ac.ug\",\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Login (sets {{token}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.token) { pm.environment.set('token', json.token); }",
+                  "if (json && json.user && json.user.email) { pm.environment.set('email', json.user.email); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser123@must.ac.ug\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/logout"
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser123@must.ac.ug\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/forgot-password"
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"PASTE_TOKEN_FROM_FORGOT_PASSWORD_IN_LOCAL_PROFILE\",\n  \"password\": \"newpassword123\",\n  \"confirmPassword\": \"newpassword123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/reset-password"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/users/profile"
+          }
+        },
+        {
+          "name": "Update Profile (registered location)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campus\": \"main\",\n  \"phoneNumber\": \"+256700000000\",\n  \"registeredLocation\": {\n    \"label\": \"Library\",\n    \"lat\": 0.329,\n    \"lng\": 32.571\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/users/profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/categories"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Listings",
+      "item": [
+        {
+          "name": "Create Listing (sets {{listingId}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.id) { pm.environment.set('listingId', json.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Laptop\",\n  \"priceUgx\": 1000000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Good condition\",\n  \"useRegisteredLocation\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/listings"
+          }
+        },
+        {
+          "name": "My Listings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/my?status=ALL"
+          }
+        },
+        {
+          "name": "Update Listing",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated title\",\n  \"priceUgx\": 1200000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}"
+          }
+        },
+        {
+          "name": "Attach Listing Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/image.jpg\",\n  \"publicId\": \"example-public-id\",\n  \"width\": 800,\n  \"height\": 600,\n  \"bytes\": 12345\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/images"
+          }
+        },
+        {
+          "name": "Remove Listing Image",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/images/{{imageId}}"
+          }
+        },
+        {
+          "name": "Soft Delete Listing",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/delete"
+          }
+        },
+        {
+          "name": "Restore Listing",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/restore"
+          }
+        },
+        {
+          "name": "Mark Listing SOLD",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/sold"
+          }
+        },
+        {
+          "name": "Purge Listing",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/purge"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Browse",
+      "item": [
+        {
+          "name": "Search Listings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/search?query=laptop&page=0&size=20"
+          }
+        },
+        {
+          "name": "Nearby Listings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/nearby?lat=0.329&lng=32.571&radiusKm=5&page=0&size=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookmarks",
+      "item": [
+        {
+          "name": "Add Bookmark",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"listingId\": {{listingId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/bookmarks"
+          }
+        },
+        {
+          "name": "List Bookmarks",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/bookmarks?page=0&size=20"
+          }
+        },
+        {
+          "name": "Remove Bookmark",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/bookmarks?listingId={{listingId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Conversations",
+      "item": [
+        {
+          "name": "Create/Get Conversation (sets {{conversationId}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.id) { pm.environment.set('conversationId', json.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"listingId\": {{listingId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/conversations"
+          }
+        },
+        {
+          "name": "List Conversations",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/conversations?page=0&size=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "Send Message (sets {{messageId}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.id) { pm.environment.set('messageId', json.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Hello from Postman\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
+          }
+        },
+        {
+          "name": "Latest Messages",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages?limit=50"
+          }
+        },
+        {
+          "name": "Long Poll Messages",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages/long-poll?afterMessageId={{messageId}}&timeoutSeconds=25"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Uploads",
+      "item": [
+        {
+          "name": "Cloudinary Signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"folder\": \"campusplug\",\n  \"resourceType\": \"image\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/uploads/cloudinary/signature"
+          }
+        }
+      ]
+    }
+  ]
+}
