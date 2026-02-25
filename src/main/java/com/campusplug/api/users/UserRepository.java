@@ -28,6 +28,12 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
         Double getRegisteredLat();
 
         Double getRegisteredLng();
+
+        String getAlternateLocationText();
+
+        Double getAlternateLat();
+
+        Double getAlternateLng();
     }
 
     @Query("select u from UserEntity u where lower(u.email) = lower(:email)")
@@ -43,7 +49,10 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
               u.campus as campus,
               u.registered_location_text as registeredLocationText,
               case when u.registered_geo is null then null else ST_Y(u.registered_geo::geometry) end as registeredLat,
-              case when u.registered_geo is null then null else ST_X(u.registered_geo::geometry) end as registeredLng
+                            case when u.registered_geo is null then null else ST_X(u.registered_geo::geometry) end as registeredLng,
+                            u.alternate_location_text as alternateLocationText,
+                            case when u.alternate_geo is null then null else ST_Y(u.alternate_geo::geometry) end as alternateLat,
+                            case when u.alternate_geo is null then null else ST_X(u.alternate_geo::geometry) end as alternateLng
             from users u
             where lower(u.email) = lower(:email)
             """, nativeQuery = true)
@@ -68,6 +77,26 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
             where id = :userId
             """, nativeQuery = true)
     int clearRegisteredGeo(@Param("userId") Long userId);
+
+    @Transactional
+    @Modifying
+    @Query(value = """
+            update users
+            set alternate_geo = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
+                updated_at = now()
+            where id = :userId
+            """, nativeQuery = true)
+    int updateAlternateGeo(@Param("userId") Long userId, @Param("lat") double lat, @Param("lng") double lng);
+
+    @Transactional
+    @Modifying
+    @Query(value = """
+            update users
+            set alternate_geo = null,
+                updated_at = now()
+            where id = :userId
+            """, nativeQuery = true)
+    int clearAlternateGeo(@Param("userId") Long userId);
 
     boolean existsByRegistrationNumber(String registrationNumber);
 }

@@ -1,4 +1,25 @@
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: campusplug-api
+    environment:
+      PORT: 8080
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/campusplug
+      SPRING_DATASOURCE_USERNAME: campusplug
+      SPRING_DATASOURCE_PASSWORD: campusplug
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   db:
     image: postgis/postgis:16-3.4
     container_name: campusplug-postgis

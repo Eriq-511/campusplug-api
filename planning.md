@@ -14,6 +14,7 @@
 - Local dev should run with **one command** (after initial dependency download):
   - start dependencies via Docker Compose
   - start the API
+- **Chosen command: `make dev`** (starts PostGIS + Redis in Docker, waits for health, then runs the API via Maven on the host JVM)
 - Database schema must be created/updated via **Flyway migrations automatically on startup** (including PostGIS extension enablement).
 - All configuration must be via **environment variables / application profiles** (no editing code to deploy).
 - Render deploy must boot successfully without manual DB steps (no clicking SQL consoles).
@@ -454,9 +455,9 @@ This section turns the UI into explicit backend requirements.
   - `postgis/postgis` (Postgres + PostGIS)
   - `redis` (optional)
 
-- Repo scripts/docs for zero-touch local run (choose one):
-  - `./mvnw spring-boot:run` + `docker compose up -d`
-  - or a single helper script (e.g., `scripts/dev.ps1`) that runs both
+- Repo scripts/docs for zero-touch local run:
+  - **`make dev`** ← chosen command (starts db + redis in Docker, waits for health, then runs API via Maven on host JVM)
+  - `Makefile` in repo root defines `dev`, `up`, `down`, `build`, `test`, `clean`, `logs`, `ps` targets
 
 **Testing criteria**
 - ✅ `mvn test` passes in CI

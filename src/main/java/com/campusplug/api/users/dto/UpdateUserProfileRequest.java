@@ -16,6 +16,9 @@ public class UpdateUserProfileRequest {
     @Valid
     private RegisteredLocationDto registeredLocation;
 
+    @Valid
+    private RegisteredLocationDto alternateLocation;
+
     // Immutable fields: if provided by client, reject.
     private String email;
 
@@ -51,6 +54,14 @@ public class UpdateUserProfileRequest {
 
     public void setRegisteredLocation(RegisteredLocationDto registeredLocation) {
         this.registeredLocation = registeredLocation;
+    }
+
+    public RegisteredLocationDto getAlternateLocation() {
+        return alternateLocation;
+    }
+
+    public void setAlternateLocation(RegisteredLocationDto alternateLocation) {
+        this.alternateLocation = alternateLocation;
     }
 
     public String getEmail() {

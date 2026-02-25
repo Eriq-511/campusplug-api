@@ -1,10 +1,10 @@
 package com.campusplug.api.listings.dto;
 
-import com.campusplug.api.listings.ListingStatus;
-import com.campusplug.api.listings.images.dto.ListingImageResponse;
-
 import java.time.Instant;
 import java.util.List;
+
+import com.campusplug.api.listings.ListingStatus;
+import com.campusplug.api.listings.images.dto.ListingImageResponse;
 
 public record ListingResponse(
         Long id,
@@ -17,6 +17,7 @@ public record ListingResponse(
         String locationText,
         String campus,
         ListingStatus status,
+        ListingActions actions,
         Instant createdAt,
         String primaryImageUrl,
         List<ListingImageResponse> images

@@ -1,21 +1,23 @@
 package com.campusplug.api.security.ratelimit;
 
-import com.campusplug.api.common.ApiErrorResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Locale;
+
 import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Locale;
+import com.campusplug.api.common.ApiErrorResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class AuthRateLimitFilter extends OncePerRequestFilter {
@@ -52,16 +54,15 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
         boolean allowed = true;
 
-        if (path.equals("/api/v1/auth/login") && method.equals("POST")) {
+        if (path.equals("/api/v1/auth/forgot-password") && method.equals("POST")) {
             allowed =
-                    rateLimiter.allow("campusplug:rl:login:ip:" + ip, 5, Duration.ofMinutes(1))
-                            && rateLimiter.allow("campusplug:rl:login:email:" + emailKey(effectiveRequest), 5, Duration.ofMinutes(1));
-        } else if (path.equals("/api/v1/auth/forgot-password") && method.equals("POST")) {
-            allowed =
-                    rateLimiter.allow("campusplug:rl:forgot:ip:" + ip, 3, Duration.ofHours(1))
-                            && rateLimiter.allow("campusplug:rl:forgot:email:" + emailKey(effectiveRequest), 3, Duration.ofHours(1));
-        } else if (path.equals("/api/v1/auth/register") && method.equals("POST")) {
-            allowed = rateLimiter.allow("campusplug:rl:register:ip:" + ip, 3, Duration.ofHours(1));
+                    rateLimiter.allow("campusplug:rl:forgot:ip:" + ip, 5, Duration.ofMinutes(2))
+                            && rateLimiter.allow("campusplug:rl:forgot:email:" + emailKey(effectiveRequest), 5, Duration.ofMinutes(2));
+        }
+
+        if (path.equals("/api/v1/auth/verify-otp") && method.equals("POST")) {
+            // 5 attempts per 2 min per email — brute-force protection for 6-digit OTP
+            allowed = rateLimiter.allow("campusplug:rl:otp:email:" + emailKey(effectiveRequest), 5, Duration.ofMinutes(2));
         }
 
         if (!allowed) {

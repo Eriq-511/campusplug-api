@@ -58,8 +58,16 @@ public class UserProfileService {
             user.setCampus(campus.isBlank() ? null : campus.toLowerCase(Locale.ROOT));
         }
 
+        if (req.getRegisteredLocation() != null && req.getAlternateLocation() != null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "LOCATION_CONFLICT", "Provide only one of registeredLocation or alternateLocation");
+        }
+
         if (req.getRegisteredLocation() != null) {
             applyRegisteredLocation(user, req.getRegisteredLocation());
+        }
+
+        if (req.getAlternateLocation() != null) {
+            applyAlternateLocation(user, req.getAlternateLocation());
         }
 
         userRepository.save(user);
@@ -86,6 +94,26 @@ public class UserProfileService {
         userRepository.updateRegisteredGeo(user.getId(), lat, lng);
     }
 
+    private void applyAlternateLocation(UserEntity user, RegisteredLocationDto loc) {
+        String label = loc.getLabel() == null ? null : loc.getLabel().trim();
+        Double lat = loc.getLat();
+        Double lng = loc.getLng();
+
+        boolean allEmpty = (label == null || label.isBlank()) && lat == null && lng == null;
+        if (allEmpty) {
+            user.setAlternateLocationText(null);
+            userRepository.clearAlternateGeo(user.getId());
+            return;
+        }
+
+        if (label == null || label.isBlank() || lat == null || lng == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_LOCATION", "alternateLocation requires label, lat and lng");
+        }
+
+        user.setAlternateLocationText(label);
+        userRepository.updateAlternateGeo(user.getId(), lat, lng);
+    }
+
     private static UserProfileResponse toResponse(UserRepository.UserProfileProjection p) {
         UserProfileResponse.RegisteredLocation location = null;
         if (p.getRegisteredLat() != null && p.getRegisteredLng() != null) {
@@ -96,6 +124,15 @@ public class UserProfileService {
             );
         }
 
+        UserProfileResponse.RegisteredLocation alternate = null;
+        if (p.getAlternateLat() != null && p.getAlternateLng() != null) {
+            alternate = new UserProfileResponse.RegisteredLocation(
+                p.getAlternateLocationText(),
+                p.getAlternateLat(),
+                p.getAlternateLng()
+            );
+        }
+
         return new UserProfileResponse(
                 p.getId(),
                 p.getFullName(),
@@ -103,7 +140,8 @@ public class UserProfileService {
                 p.getRegistrationNumber(),
                 p.getPhoneNumber(),
                 p.getCampus(),
-                location
+            location,
+            alternate
         );
     }
 

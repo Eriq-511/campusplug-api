@@ -22,7 +22,7 @@ public class CreateListingRequest {
     @Size(max = 500)
     private String description;
 
-    private boolean useRegisteredLocation;
+    private Boolean useRegisteredLocation;
 
     @Size(max = 200)
     private String locationText;
@@ -66,11 +66,11 @@ public class CreateListingRequest {
         this.description = description;
     }
 
-    public boolean isUseRegisteredLocation() {
+    public Boolean getUseRegisteredLocation() {
         return useRegisteredLocation;
     }
 
-    public void setUseRegisteredLocation(boolean useRegisteredLocation) {
+    public void setUseRegisteredLocation(Boolean useRegisteredLocation) {
         this.useRegisteredLocation = useRegisteredLocation;
     }
 

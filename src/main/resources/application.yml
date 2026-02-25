@@ -29,6 +29,17 @@ spring:
   cache:
     type: redis
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USER:}
+    password: ${GMAIL_APP_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
+    test-connection: false
+
 app:
   auth:
     allowed-email-domains: ${APP_AUTH_ALLOWED_EMAIL_DOMAINS:must.ac.ug,std.must.ac.ug}
@@ -36,6 +47,7 @@ app:
       secret: ${JWT_SECRET:dev-secret-change-me}
       ttl-seconds: ${APP_JWT_TTL_SECONDS:2592000}
     frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:3000}
+    otp-enabled: ${APP_OTP_ENABLED:false}
 
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
@@ -44,6 +56,10 @@ app:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}
     api-secret: ${CLOUDINARY_API_SECRET:}
+
+  email:
+    from: ${GMAIL_USER:noreply@campusplug.local}
+    enabled: ${APP_EMAIL_ENABLED:false}
 
   cache:
     key-prefix: ${APP_CACHE_KEY_PREFIX:campusplug:cache:}

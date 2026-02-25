@@ -1,8 +1,19 @@
 package com.campusplug.api.listings;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.campusplug.api.cache.CacheEvictionService;
 import com.campusplug.api.common.ApiException;
 import com.campusplug.api.listings.dto.CreateListingRequest;
+import com.campusplug.api.listings.dto.ListingActions;
 import com.campusplug.api.listings.dto.ListingResponse;
 import com.campusplug.api.listings.dto.MyListingsResponse;
 import com.campusplug.api.listings.dto.UpdateListingRequest;
@@ -12,15 +23,6 @@ import com.campusplug.api.listings.images.dto.AttachListingImageRequest;
 import com.campusplug.api.listings.images.dto.ListingImageResponse;
 import com.campusplug.api.realtime.ListingsRealtimePublisher;
 import com.campusplug.api.users.UserRepository;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
 @Service
 public class ListingService {
@@ -63,9 +65,35 @@ public class ListingService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "categoryCode must not be blank");
         }
 
+        boolean hasExplicitLocationField = req.getLocationText() != null
+            || req.getLat() != null
+            || req.getLng() != null
+            || req.getCampus() != null;
+
+        boolean hasRegisteredLocation = user.getRegisteredLat() != null
+                && user.getRegisteredLng() != null
+                && !isBlank(user.getRegisteredLocationText());
+
+        boolean hasAlternateLocation = user.getAlternateLat() != null
+                && user.getAlternateLng() != null
+                && !isBlank(user.getAlternateLocationText());
+
+        LocationSource source;
+        if (Boolean.TRUE.equals(req.getUseRegisteredLocation())) {
+            source = LocationSource.REGISTERED;
+        } else if (hasExplicitLocationField) {
+            source = LocationSource.EXPLICIT;
+        } else if (hasRegisteredLocation) {
+            source = LocationSource.REGISTERED;
+        } else if (hasAlternateLocation) {
+            source = LocationSource.ALTERNATE;
+        } else {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "SAVED_LOCATION_MISSING", "User has no saved location");
+        }
+
         LocationResolved loc = resolveLocation(
                 user,
-                req.isUseRegisteredLocation(),
+                source,
                 req.getLocationText(),
                 req.getLat(),
                 req.getLng(),
@@ -163,10 +191,12 @@ public class ListingService {
                 || req.getCampus() != null;
 
         if (hasAnyLocationField) {
-            boolean useRegistered = req.getUseRegisteredLocation() != null && req.getUseRegisteredLocation();
+                LocationSource source = req.getUseRegisteredLocation() != null && req.getUseRegisteredLocation()
+                    ? LocationSource.REGISTERED
+                    : LocationSource.EXPLICIT;
             LocationResolved loc = resolveLocation(
                     user,
-                    useRegistered,
+                    source,
                     req.getLocationText(),
                     req.getLat(),
                     req.getLng(),
@@ -306,9 +336,9 @@ public class ListingService {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not found"));
     }
 
-    private static LocationResolved resolveLocation(
+        private static LocationResolved resolveLocation(
             UserRepository.UserProfileProjection user,
-            boolean useRegisteredLocation,
+            LocationSource source,
             String locationText,
             Double lat,
             Double lng,
@@ -319,7 +349,7 @@ public class ListingService {
             resolvedCampus = normalizeCampus(user.getCampus());
         }
 
-        if (useRegisteredLocation) {
+        if (source == LocationSource.REGISTERED) {
             if (user.getRegisteredLat() == null || user.getRegisteredLng() == null || isBlank(user.getRegisteredLocationText())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "REGISTERED_LOCATION_MISSING", "User has no registered location");
             }
@@ -328,6 +358,17 @@ public class ListingService {
             Double rLat = user.getRegisteredLat();
             Double rLng = user.getRegisteredLng();
             return new LocationResolved(label, rLat, rLng, resolvedCampus);
+        }
+
+        if (source == LocationSource.ALTERNATE) {
+            if (user.getAlternateLat() == null || user.getAlternateLng() == null || isBlank(user.getAlternateLocationText())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ALTERNATE_LOCATION_MISSING", "User has no alternate location");
+            }
+
+            String label = user.getAlternateLocationText().trim();
+            Double aLat = user.getAlternateLat();
+            Double aLng = user.getAlternateLng();
+            return new LocationResolved(label, aLat, aLng, resolvedCampus);
         }
 
         if ((lat == null) != (lng == null)) {
@@ -365,6 +406,13 @@ public class ListingService {
         List<ListingImageResponse> safeImages = images == null ? List.of() : images;
         String primary = safeImages.isEmpty() ? null : safeImages.get(0).secureUrl();
 
+        ListingActions actions = switch (e.getStatus()) {
+            case ACTIVE  -> ListingActions.forActive();
+            case SOLD    -> ListingActions.forSold();
+            case DELETED -> ListingActions.forDeleted();
+            default      -> ListingActions.forPending();
+        };
+
         return new ListingResponse(
                 e.getId(),
                 e.getOwnerUserId(),
@@ -376,6 +424,7 @@ public class ListingService {
                 e.getLocationText(),
                 e.getCampus(),
                 e.getStatus(),
+                actions,
                 e.getCreatedAt(),
                 primary,
                 safeImages
@@ -416,5 +465,11 @@ public class ListingService {
     }
 
     private record LocationResolved(String locationText, Double lat, Double lng, String campus) {
+    }
+
+    private enum LocationSource {
+        REGISTERED,
+        ALTERNATE,
+        EXPLICIT
     }
 }

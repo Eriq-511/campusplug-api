@@ -226,6 +226,11 @@ class AuthPhase3IntegrationTest {
                   "fullName": "Test User",
                   "registrationNumber": "2024/BIT/%d",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }
@@ -245,6 +250,11 @@ class AuthPhase3IntegrationTest {
                   "fullName": "Test User",
                   "registrationNumber": "2024/BIT/%d",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }
@@ -279,6 +289,11 @@ class AuthPhase3IntegrationTest {
                   "fullName": "Test User",
                   "registrationNumber": "%s",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }
@@ -298,6 +313,11 @@ class AuthPhase3IntegrationTest {
                   "fullName": "Test User",
                   "registrationNumber": "%s",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }
@@ -330,6 +350,11 @@ class AuthPhase3IntegrationTest {
                   "fullName": "Rate Limit User",
                   "registrationNumber": "%s",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }
@@ -424,6 +449,11 @@ class AuthPhase3IntegrationTest {
                   "registrationNumber": "%s",
                   "email": "%s",
                   "phoneNumber": "+256700000000",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }
@@ -481,6 +511,11 @@ class AuthPhase3IntegrationTest {
                   "fullName": "Reset User",
                   "registrationNumber": "%s",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }
@@ -560,6 +595,11 @@ class AuthPhase3IntegrationTest {
                   "fullName": "Logout User",
                   "registrationNumber": "%s",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }

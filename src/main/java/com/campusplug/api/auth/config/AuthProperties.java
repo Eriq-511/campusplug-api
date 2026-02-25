@@ -1,8 +1,8 @@
 package com.campusplug.api.auth.config;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 import java.util.List;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.auth")
 public class AuthProperties {
@@ -10,6 +10,7 @@ public class AuthProperties {
     private List<String> allowedEmailDomains;
     private Jwt jwt = new Jwt();
     private String frontendBaseUrl;
+    private boolean otpEnabled = false;
 
     public List<String> getAllowedEmailDomains() {
         return allowedEmailDomains;
@@ -33,6 +34,14 @@ public class AuthProperties {
 
     public void setFrontendBaseUrl(String frontendBaseUrl) {
         this.frontendBaseUrl = frontendBaseUrl;
+    }
+
+    public boolean isOtpEnabled() {
+        return otpEnabled;
+    }
+
+    public void setOtpEnabled(boolean otpEnabled) {
+        this.otpEnabled = otpEnabled;
     }
 
     public static class Jwt {

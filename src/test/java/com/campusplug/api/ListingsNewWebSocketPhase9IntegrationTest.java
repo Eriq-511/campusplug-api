@@ -167,6 +167,11 @@ class ListingsNewWebSocketPhase9IntegrationTest {
                   "fullName": "User",
                   "registrationNumber": "%s",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }

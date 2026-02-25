@@ -40,6 +40,9 @@ public class UserEntity {
     @Column(name = "registered_location_text")
     private String registeredLocationText;
 
+    @Column(name = "alternate_location_text")
+    private String alternateLocationText;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -122,6 +125,14 @@ public class UserEntity {
 
     public void setRegisteredLocationText(String registeredLocationText) {
         this.registeredLocationText = registeredLocationText;
+    }
+
+    public String getAlternateLocationText() {
+        return alternateLocationText;
+    }
+
+    public void setAlternateLocationText(String alternateLocationText) {
+        this.alternateLocationText = alternateLocationText;
     }
 
     public Instant getCreatedAt() {

@@ -2,6 +2,7 @@
   "info": {
     "_postman_id": "8a2f1e2b-8f2b-4d3c-b2b2-0f3d9f25c3c1",
     "name": "CampusPlug API",
+    "description": "CampusPlug local dev collection. Every state-change endpoint asserts status + actions in the response so the frontend can trust the values for button visibility.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -55,7 +56,22 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"2026/BIT/123\",\n  \"email\": \"testuser123@must.ac.ug\",\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"2026/BIT/123\",\n  \"email\": \"testuser123@must.ac.ug\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"registeredLocation\": {\n    \"label\": \"MUST Main Campus\",\n    \"lat\": -0.6089,\n    \"lng\": 30.6570\n  },\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Register (alternate location fallback)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"2026/BIT/124\",\n  \"email\": \"testuser124@must.ac.ug\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  },\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/auth/register"
           }
@@ -151,6 +167,21 @@
             "url": "{{baseUrl}}/api/v1/users/profile"
           }
         }
+        ,
+        {
+          "name": "Update Profile (alternate location fallback)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/users/profile"
+          }
+        }
       ]
     },
     {
@@ -167,6 +198,7 @@
     },
     {
       "name": "Listings",
+      "description": "Listing CRUD + state actions. Every state-change request has a test script that asserts the returned status and actions flags.",
       "item": [
         {
           "name": "Create Listing (sets {{listingId}})",
@@ -175,8 +207,15 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "const json = pm.response.json();",
-                  "if (json && json.id) { pm.environment.set('listingId', json.id); }"
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "if (j && j.id) { pm.environment.set('listingId', j.id); }",
+                  "pm.test('status is ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
+                  "pm.test('actions.canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);",
+                  "pm.test('actions.canMarkSold true', () => pm.expect(j.actions.canMarkSold).to.be.true);",
+                  "pm.test('actions.canDelete true', () => pm.expect(j.actions.canDelete).to.be.true);",
+                  "pm.test('actions.canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
+                  "pm.test('actions.canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
                 ],
                 "type": "text/javascript"
               }
@@ -184,30 +223,61 @@
           ],
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Laptop\",\n  \"priceUgx\": 1000000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Good condition\",\n  \"useRegisteredLocation\": true\n}"
+              "raw": "{\n  \"title\": \"Laptop\",\n  \"priceUgx\": 1000000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Good condition\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/listings"
           }
         },
         {
-          "name": "My Listings",
+          "name": "My Listings — All",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/v1/listings/my?status=ALL"
           }
         },
         {
+          "name": "My Listings — Active",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/my?status=ACTIVE"
+          }
+        },
+        {
+          "name": "My Listings — Sold",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/my?status=SOLD"
+          }
+        },
+        {
+          "name": "My Listings — Deleted",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/my?status=DELETED"
+          }
+        },
+        {
           "name": "Update Listing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('status still ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
+                  "pm.test('actions.canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Updated title\",\n  \"priceUgx\": 1200000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Updated description\"\n}"
@@ -217,27 +287,94 @@
         },
         {
           "name": "Attach Listing Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j && j.images && j.images.length > 0) {",
+                  "  const last = j.images[j.images.length - 1];",
+                  "  pm.environment.set('imageId', last.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://example.com/image.jpg\",\n  \"publicId\": \"example-public-id\",\n  \"width\": 800,\n  \"height\": 600,\n  \"bytes\": 12345\n}"
+              "raw": "{\n  \"publicId\": \"example-public-id\",\n  \"secureUrl\": \"https://res.cloudinary.com/demo/image/upload/example-public-id.jpg\",\n  \"width\": 800,\n  \"height\": 600,\n  \"bytes\": 12345,\n  \"format\": \"jpg\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/images"
           }
         },
         {
           "name": "Remove Listing Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/images/{{imageId}}"
           }
         },
         {
+          "name": "Mark Listing SOLD",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('status is SOLD', () => pm.expect(j.status).to.eql('SOLD'));",
+                  "pm.test('actions.canEdit false (SOLD = terminal)', () => pm.expect(j.actions.canEdit).to.be.false);",
+                  "pm.test('actions.canMarkSold false', () => pm.expect(j.actions.canMarkSold).to.be.false);",
+                  "pm.test('actions.canDelete false', () => pm.expect(j.actions.canDelete).to.be.false);",
+                  "pm.test('actions.canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
+                  "pm.test('actions.canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/sold"
+          }
+        },
+        {
           "name": "Soft Delete Listing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('status is DELETED', () => pm.expect(j.status).to.eql('DELETED'));",
+                  "pm.test('actions.canEdit false', () => pm.expect(j.actions.canEdit).to.be.false);",
+                  "pm.test('actions.canMarkSold false', () => pm.expect(j.actions.canMarkSold).to.be.false);",
+                  "pm.test('actions.canDelete false', () => pm.expect(j.actions.canDelete).to.be.false);",
+                  "pm.test('actions.canRestore true', () => pm.expect(j.actions.canRestore).to.be.true);",
+                  "pm.test('actions.canPurge true', () => pm.expect(j.actions.canPurge).to.be.true);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/delete"
@@ -245,23 +382,218 @@
         },
         {
           "name": "Restore Listing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('status is ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
+                  "pm.test('actions.canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);",
+                  "pm.test('actions.canMarkSold true', () => pm.expect(j.actions.canMarkSold).to.be.true);",
+                  "pm.test('actions.canDelete true', () => pm.expect(j.actions.canDelete).to.be.true);",
+                  "pm.test('actions.canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
+                  "pm.test('actions.canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/restore"
           }
         },
         {
-          "name": "Mark Listing SOLD",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/sold"
-          }
-        },
-        {
-          "name": "Purge Listing",
+          "name": "Purge Listing (hard delete — must be DELETED first)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/purge"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Listing Lifecycle (state machine demo)",
+      "description": "Runs the full state machine in order. Uses {{token}} so log in first. Each step asserts status + actions in the response.",
+      "item": [
+        {
+          "name": "LC1 — Create (→ ACTIVE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "if (j && j.id) { pm.environment.set('lcListingId', j.id); }",
+                  "pm.test('status ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
+                  "pm.test('canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);",
+                  "pm.test('canMarkSold true', () => pm.expect(j.actions.canMarkSold).to.be.true);",
+                  "pm.test('canDelete true', () => pm.expect(j.actions.canDelete).to.be.true);",
+                  "pm.test('canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
+                  "pm.test('canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"LC Test Item\",\n  \"priceUgx\": 50000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Lifecycle demo\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/listings"
+          }
+        },
+        {
+          "name": "LC2 — Delete (ACTIVE → DELETED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('status DELETED', () => pm.expect(j.status).to.eql('DELETED'));",
+                  "pm.test('canEdit false', () => pm.expect(j.actions.canEdit).to.be.false);",
+                  "pm.test('canDelete false', () => pm.expect(j.actions.canDelete).to.be.false);",
+                  "pm.test('canRestore true', () => pm.expect(j.actions.canRestore).to.be.true);",
+                  "pm.test('canPurge true', () => pm.expect(j.actions.canPurge).to.be.true);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId}}/delete"
+          }
+        },
+        {
+          "name": "LC3 — Restore (DELETED → ACTIVE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('status ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
+                  "pm.test('canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);",
+                  "pm.test('canDelete true', () => pm.expect(j.actions.canDelete).to.be.true);",
+                  "pm.test('canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
+                  "pm.test('canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId}}/restore"
+          }
+        },
+        {
+          "name": "LC4 — Mark SOLD (ACTIVE → SOLD)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('status SOLD', () => pm.expect(j.status).to.eql('SOLD'));",
+                  "pm.test('canEdit false (terminal)', () => pm.expect(j.actions.canEdit).to.be.false);",
+                  "pm.test('canMarkSold false', () => pm.expect(j.actions.canMarkSold).to.be.false);",
+                  "pm.test('canDelete false', () => pm.expect(j.actions.canDelete).to.be.false);",
+                  "pm.test('canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
+                  "pm.test('canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId}}/sold"
+          }
+        },
+        {
+          "name": "LC5 — Create second listing for purge path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j && j.id) { pm.environment.set('lcListingId2', j.id); }",
+                  "pm.test('status ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"LC Purge Test Item\",\n  \"priceUgx\": 10000,\n  \"categoryCode\": \"BOOKS\",\n  \"description\": \"Will be purged\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/listings"
+          }
+        },
+        {
+          "name": "LC6 — Delete second listing (ACTIVE → DELETED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test('status DELETED', () => pm.expect(j.status).to.eql('DELETED'));",
+                  "pm.test('canPurge true', () => pm.expect(j.actions.canPurge).to.be.true);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId2}}/delete"
+          }
+        },
+        {
+          "name": "LC7 — Purge (DELETED → gone, 204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId2}}/purge"
           }
         }
       ]
@@ -402,6 +734,163 @@
       ]
     },
     {
+      "name": "Conversation Flow (2-user demo)",
+      "description": "Step-by-step: Seller creates listing, Buyer starts conversation, both exchange messages. Run in order.",
+      "item": [
+        {
+          "name": "Step 1 — Register Seller",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["const j = pm.response.json(); if (j && j.token) { pm.environment.set('sellerToken', j.token); pm.environment.set('token', j.token); } "],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Alice Seller\",\n  \"registrationNumber\": \"2025/BIT/001\",\n  \"email\": \"alice.seller@std.must.ac.ug\",\n  \"phoneNumber\": \"+256700000001\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 },\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Step 2 — Register Buyer",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["const j = pm.response.json(); if (j && j.token) { pm.environment.set('buyerToken', j.token); } "],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Bob Buyer\",\n  \"registrationNumber\": \"2025/BIT/002\",\n  \"email\": \"bob.buyer@std.must.ac.ug\",\n  \"phoneNumber\": \"+256700000002\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 },\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Step 3 — Login as Seller (sets sellerToken + token)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["const j = pm.response.json(); if (j && j.token) { pm.environment.set('sellerToken', j.token); pm.environment.set('token', j.token); }"],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"alice.seller@std.must.ac.ug\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Step 4 — Create Listing as Seller (sets listingId)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["const j = pm.response.json(); if (j && j.id) { pm.environment.set('listingId', j.id); }"],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"MacBook Pro 2021\",\n  \"priceUgx\": 4500000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Great condition, barely used\"\n}" },
+            "url": "{{baseUrl}}/api/v1/listings"
+          }
+        },
+        {
+          "name": "Step 5 — Login as Buyer (sets buyerToken + token)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["const j = pm.response.json(); if (j && j.token) { pm.environment.set('buyerToken', j.token); pm.environment.set('token', j.token); }"],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"bob.buyer@std.must.ac.ug\",\n  \"password\": \"password123\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Step 6 — Buyer starts Conversation (sets conversationId)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["const j = pm.response.json(); if (j && j.id) { pm.environment.set('conversationId', j.id); }"],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{buyerToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"listingId\": {{listingId}}\n}" },
+            "url": "{{baseUrl}}/api/v1/conversations"
+          }
+        },
+        {
+          "name": "Step 7 — Buyer sends Message (sets messageId)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["const j = pm.response.json(); if (j && j.id) { pm.environment.set('messageId', j.id); }"],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{buyerToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"body\": \"Hi, is this still available?\"\n}" },
+            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
+          }
+        },
+        {
+          "name": "Step 8 — Seller replies",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"body\": \"Yes, still available! When can you come?\"\n}" },
+            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
+          }
+        },
+        {
+          "name": "Step 9 — Seller reads messages",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages?limit=50"
+          }
+        }
+      ]
+    },
+    {
       "name": "Uploads",
       "item": [
         {
@@ -413,7 +902,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"folder\": \"campusplug\",\n  \"resourceType\": \"image\"\n}"
+              "raw": "{\n  \"listingId\": {{listingId}},\n  \"folder\": \"campusplug/listings/{{listingId}}\",\n  \"publicId\": \"{{listingId}}-main\",\n  \"overwrite\": false\n}"
             },
             "url": "{{baseUrl}}/api/v1/uploads/cloudinary/signature"
           }

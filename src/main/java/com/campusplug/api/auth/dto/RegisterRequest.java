@@ -1,5 +1,7 @@
 package com.campusplug.api.auth.dto;
 
+import com.campusplug.api.users.dto.RegisteredLocationDto;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -17,6 +19,15 @@ public class RegisterRequest {
     private String email;
 
     private String phoneNumber;
+
+    @Size(max = 50)
+    private String campus;
+
+    @Valid
+    private RegisteredLocationDto registeredLocation;
+
+    @Valid
+    private RegisteredLocationDto alternateLocation;
 
     @NotBlank
     @Size(min = 8, max = 72)
@@ -56,6 +67,30 @@ public class RegisterRequest {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    public String getCampus() {
+        return campus;
+    }
+
+    public void setCampus(String campus) {
+        this.campus = campus;
+    }
+
+    public RegisteredLocationDto getRegisteredLocation() {
+        return registeredLocation;
+    }
+
+    public void setRegisteredLocation(RegisteredLocationDto registeredLocation) {
+        this.registeredLocation = registeredLocation;
+    }
+
+    public RegisteredLocationDto getAlternateLocation() {
+        return alternateLocation;
+    }
+
+    public void setAlternateLocation(RegisteredLocationDto alternateLocation) {
+        this.alternateLocation = alternateLocation;
     }
 
     public String getPassword() {

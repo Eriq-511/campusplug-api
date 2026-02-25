@@ -1,7 +1,9 @@
 package com.campusplug.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Duration;
+import java.util.concurrent.ThreadLocalRandom;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -10,23 +12,21 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-import java.time.Duration;
-import java.util.concurrent.ThreadLocalRandom;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest
+@SpringBootTest(classes = CampusplugApiApplication.class)
 @AutoConfigureMockMvc
 @SuppressWarnings({"unused", "resource"})
 class ListingsPhase5IntegrationTest {
@@ -125,6 +125,126 @@ class ListingsPhase5IntegrationTest {
 
         JsonNode myJson = objectMapper.readTree(my);
         assertThat(myJson.get("items").size()).isGreaterThan(0);
+    }
+
+    @Test
+    void createListingDefaultsToRegisteredLocationWhenNoLocationFieldsProvided() throws Exception {
+        String ip = "10.5.9." + ThreadLocalRandom.current().nextInt(2, 250);
+        String email = "p5regloc" + ThreadLocalRandom.current().nextInt(1000, 9999) + "@must.ac.ug";
+        String regNo = "2099/BIT/" + ThreadLocalRandom.current().nextInt(100, 999);
+
+        String registerBody = """
+                {
+                  "fullName": "User",
+                  "registrationNumber": "%s",
+                  "email": "%s",
+                  "password": "password123",
+                  "confirmPassword": "password123",
+                  "campus": "main",
+                  "registeredLocation": {
+                    "label": "Kampala, Uganda",
+                    "lat": 0.329,
+                    "lng": 32.571
+                  }
+                }
+                """.formatted(regNo, email);
+
+        String regResponse = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .with(req -> {
+                            req.setRemoteAddr(ip);
+                            return req;
+                        })
+                        .content(registerBody))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String token = objectMapper.readTree(regResponse).get("token").asText();
+
+        // Sell flow can omit all location fields now.
+        String createListing = """
+                {
+                  "title": "Laptop",
+                  "priceUgx": 1000000,
+                  "categoryCode": "ELECTRONICS",
+                  "description": "Good condition"
+                }
+                """;
+
+        String created = mockMvc.perform(post("/api/v1/listings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + token)
+                        .content(createListing))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        JsonNode createdJson = objectMapper.readTree(created);
+        assertThat(createdJson.get("status").asText()).isEqualTo("ACTIVE");
+        assertThat(createdJson.get("locationText").asText()).isEqualTo("Kampala, Uganda");
+        assertThat(createdJson.get("campus").asText()).isEqualTo("main");
+    }
+
+    @Test
+    void createListingDefaultsToAlternateLocationWhenRegisteredMissing() throws Exception {
+        String ip = "10.5.8." + ThreadLocalRandom.current().nextInt(2, 250);
+        String email = "p5altloc" + ThreadLocalRandom.current().nextInt(1000, 9999) + "@must.ac.ug";
+        String regNo = "2099/BIT/" + ThreadLocalRandom.current().nextInt(100, 999);
+
+        String registerBody = """
+                {
+                  "fullName": "User",
+                  "registrationNumber": "%s",
+                  "email": "%s",
+                  "password": "password123",
+                  "confirmPassword": "password123",
+                  "campus": "main",
+                  "alternateLocation": {
+                    "label": "Cafe Havana",
+                    "lat": 0.330,
+                    "lng": 32.572
+                  }
+                }
+                """.formatted(regNo, email);
+
+        String regResponse = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .with(req -> {
+                            req.setRemoteAddr(ip);
+                            return req;
+                        })
+                        .content(registerBody))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String token = objectMapper.readTree(regResponse).get("token").asText();
+
+        String createListing = """
+                {
+                  "title": "Headphones",
+                  "priceUgx": 50000,
+                  "categoryCode": "ELECTRONICS",
+                  "description": "New"
+                }
+                """;
+
+        String created = mockMvc.perform(post("/api/v1/listings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + token)
+                        .content(createListing))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        JsonNode createdJson = objectMapper.readTree(created);
+        assertThat(createdJson.get("locationText").asText()).isEqualTo("Cafe Havana");
+        assertThat(createdJson.get("campus").asText()).isEqualTo("main");
     }
 
     @Test
@@ -252,6 +372,11 @@ class ListingsPhase5IntegrationTest {
                   "fullName": "User",
                   "registrationNumber": "%s",
                   "email": "%s",
+                                                                        "registeredLocation": {
+                                                                                "label": "MUST Main Campus",
+                                                                                "lat": -0.6089,
+                                                                                "lng": 30.6570
+                                                                        },
                   "password": "password123",
                   "confirmPassword": "password123"
                 }
