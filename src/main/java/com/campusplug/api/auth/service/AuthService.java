@@ -3,7 +3,6 @@ package com.campusplug.api.auth.service;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 import org.springframework.core.env.Environment;
@@ -40,6 +39,7 @@ public class AuthService {
     private final RevokedTokenStore revokedTokenStore;
     private final EmailDomainValidator emailDomainValidator;
     private final PasswordResetTokenStore passwordResetTokenStore;
+    private final PasswordResetOtpStore passwordResetOtpStore;
     private final Environment environment;
     private final EmailService emailService;
     private final AuthProperties authProperties;
@@ -52,6 +52,7 @@ public class AuthService {
             RevokedTokenStore revokedTokenStore,
             EmailDomainValidator emailDomainValidator,
             PasswordResetTokenStore passwordResetTokenStore,
+            PasswordResetOtpStore passwordResetOtpStore,
             Environment environment,
             EmailService emailService,
             AuthProperties authProperties,
@@ -62,6 +63,7 @@ public class AuthService {
         this.revokedTokenStore = revokedTokenStore;
         this.emailDomainValidator = emailDomainValidator;
         this.passwordResetTokenStore = passwordResetTokenStore;
+        this.passwordResetOtpStore = passwordResetOtpStore;
         this.environment = environment;
         this.emailService = emailService;
         this.authProperties = authProperties;
@@ -69,7 +71,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse register(RegisterRequest req) {
+    public Object register(RegisterRequest req) {
         if (!req.getPassword().equals(req.getConfirmPassword())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "confirmPassword must match password");
         }
@@ -110,8 +112,21 @@ public class AuthService {
 
         persistSavedLocationGeoOnRegister(saved.getId(), req.getRegisteredLocation(), req.getAlternateLocation());
 
-        String token = jwtService.createToken(saved);
-        return new AuthResponse(token, toSummary(saved));
+        if (!authProperties.isOtpEnabled()) {
+            // OTP disabled — return JWT directly (preserves existing test behaviour)
+            String token = jwtService.createToken(saved);
+            return new AuthResponse(token, toSummary(saved));
+        }
+
+        // OTP enabled — send email verification code; JWT only issued after /verify-otp
+        String otp = otpStore.createOtp(email);
+        emailService.sendOtpEmail(email, otp);
+
+        String masked = maskEmail(email);
+        return Map.of(
+                "status", "OTP_SENT",
+                "message", "A 6-digit verification code was sent to " + masked
+        );
     }
 
     /**
@@ -194,21 +209,20 @@ public class AuthService {
         String email = normalizeEmail(emailInput);
         emailDomainValidator.validateAllowedDomain(email);
 
-        Optional<UserEntity> userOpt = userRepository.findByEmailIgnoreCase(email);
-        String token = null;
-        if (userOpt.isPresent()) {
-            token = passwordResetTokenStore.createToken(userOpt.get().getId());
+        String devOtp = null;
+        if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
+            // Generate a 6-digit numeric OTP (matches the UI code-entry screen)
+            String otp = passwordResetOtpStore.createOtp(email);
             // Send email asynchronously — never blocks the HTTP response
-            emailService.sendPasswordResetEmail(email, token, authProperties.getFrontendBaseUrl());
+            emailService.sendPasswordResetOtpEmail(email, otp);
+
+            boolean isProd = environment.acceptsProfiles(Profiles.of("prod"));
+            devOtp = isProd ? null : otp;
         }
 
-        boolean isProd = environment.acceptsProfiles(Profiles.of("prod"));
-        // In production, don't expose the raw token in the JSON response
-        String responseToken = isProd ? null : token;
-
         return new ForgotPasswordResponse(
-                "If the email exists, a password reset link/token will be sent.",
-                responseToken
+                "If the email exists, a 6-digit reset code will be sent to it.",
+                devOtp
         );
     }
 
@@ -217,11 +231,17 @@ public class AuthService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "confirmPassword must match password");
         }
 
-        Long userId = passwordResetTokenStore.consumeToken(req.getToken())
-                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_RESET_TOKEN", "Reset token is invalid or expired"));
+        String email = normalizeEmail(req.getEmail());
 
-        UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_RESET_TOKEN", "Reset token is invalid or expired"));
+        // Validate the 6-digit OTP the user entered on the Forgot-Password screen
+        boolean valid = passwordResetOtpStore.consumeOtp(email, req.getOtp());
+        if (!valid) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_RESET_CODE",
+                    "The reset code is incorrect or has expired. Request a new one.");
+        }
+
+        UserEntity user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_RESET_CODE", "Reset code is invalid or expired"));
 
         user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
         userRepository.save(user);

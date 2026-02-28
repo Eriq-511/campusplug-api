@@ -65,6 +65,11 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             allowed = rateLimiter.allow("campusplug:rl:otp:email:" + emailKey(effectiveRequest), 5, Duration.ofMinutes(2));
         }
 
+        if (path.equals("/api/v1/auth/reset-password") && method.equals("POST")) {
+            // 5 attempts per 2 min per email — brute-force protection for 6-digit reset OTP
+            allowed = rateLimiter.allow("campusplug:rl:resetpw:email:" + emailKey(effectiveRequest), 5, Duration.ofMinutes(2));
+        }
+
         if (!allowed) {
             response.setStatus(429);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

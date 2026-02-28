@@ -74,6 +74,50 @@ public class EmailService {
     }
 
     /**
+     * Sends a 6-digit password-reset OTP to the user's email.
+     * Runs asynchronously so it never blocks the HTTP response.
+     */
+    @Async
+    public void sendPasswordResetOtpEmail(String toEmail, String otp) {
+        if (!enabled) {
+            log.info("[EmailService] Email disabled — password reset OTP for {}: {}", toEmail, otp);
+            return;
+        }
+
+        String body = """
+                <html>
+                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
+                  <h2 style="color: #2C3E50;">CampusPlug — Password Reset Code</h2>
+                  <p>Use the code below to reset your password. It expires in <strong>10 minutes</strong>.</p>
+                  <div style="text-align: center; margin: 32px 0;">
+                    <span style="font-size: 42px; font-weight: bold; letter-spacing: 12px;
+                                 color: #E74C3C; background: #FFF5F5; padding: 16px 24px;
+                                 border-radius: 8px; display: inline-block;">%s</span>
+                  </div>
+                  <p style="color: #7F8C8D; font-size: 13px;">
+                    If you did not request a password reset, you can safely ignore this email.
+                  </p>
+                  <hr style="border: none; border-top: 1px solid #ECF0F1; margin-top: 32px;">
+                  <p style="color: #BDC3C7; font-size: 11px;">CampusPlug · Mbarara University of Science and Technology</p>
+                </body>
+                </html>
+                """.formatted(otp);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(from);
+            helper.setTo(toEmail);
+            helper.setSubject("CampusPlug — Your password reset code: " + otp);
+            helper.setText(body, true);
+            mailSender.send(message);
+            log.info("[EmailService] Password reset OTP email sent to {}", toEmail);
+        } catch (MessagingException e) {
+            log.error("[EmailService] Failed to send password reset OTP email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    /**
      * Sends a password reset email containing both a direct link and the raw token.
      * Runs asynchronously so it never blocks the HTTP response.
      */
