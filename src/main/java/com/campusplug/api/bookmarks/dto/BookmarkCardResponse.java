@@ -13,6 +13,7 @@ public record BookmarkCardResponse(
         String primaryImageUrl,
         Instant createdAt,
         String status,
-        Instant bookmarkedAt
+        Instant bookmarkedAt,
+        Double distanceMeters
 ) {
 }

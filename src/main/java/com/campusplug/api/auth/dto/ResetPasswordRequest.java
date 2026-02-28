@@ -12,7 +12,7 @@ public class ResetPasswordRequest {
     private String email;
 
     @NotBlank
-    @Pattern(regexp = "\\d{6}", message = "Reset code must be exactly 6 digits")
+    @Pattern(regexp = "\\d{5}", message = "Reset code must be exactly 5 digits")
     private String otp;
 
     @NotBlank

@@ -82,6 +82,9 @@ public class ConversationService {
                         p.getListingTitle(),
                         p.getCounterpartUserId(),
                         p.getCounterpartFullName(),
+                        p.getCounterpartEmail(),
+                        p.getCounterpartPhoneNumber(),
+                        p.getCounterpartLocationText(),
                         p.getLastMessageBody(),
                         p.getLastMessageAt(),
                         presenceService.isActive(p.getCounterpartUserId())

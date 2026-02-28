@@ -31,6 +31,9 @@ public interface BookmarkRepository extends JpaRepository<BookmarkEntity, Bookma
         Instant getListingCreatedAt();
 
         Instant getBookmarkedAt();
+
+        /** Metres from the caller's position to the listing geo-point; null when no location supplied. */
+        Double getDistanceMeters();
     }
 
     @Query(
@@ -45,7 +48,17 @@ public interface BookmarkRepository extends JpaRepository<BookmarkEntity, Bookma
                   l.campus as campus,
                   l.status::text as status,
                   l.created_at as listingCreatedAt,
-                  b.created_at as bookmarkedAt
+                  b.created_at as bookmarkedAt,
+                  case
+                    when cast(:lat as float8) is not null
+                     and cast(:lng as float8) is not null
+                     and l.geo is not null
+                    then ST_Distance(
+                           l.geo::geography,
+                           ST_SetSRID(ST_MakePoint(cast(:lng as float8), cast(:lat as float8)), 4326)::geography
+                         )
+                    else null
+                  end as distanceMeters
                 from bookmarks b
                 join listings l on l.id = b.listing_id
                 where b.user_id = :userId
@@ -58,7 +71,11 @@ public interface BookmarkRepository extends JpaRepository<BookmarkEntity, Bookma
                 """,
             nativeQuery = true
     )
-    Page<BookmarkListingProjection> findBookmarks(@Param("userId") Long userId, Pageable pageable);
+    Page<BookmarkListingProjection> findBookmarks(
+            @Param("userId") Long userId,
+            @Param("lat") Double lat,
+            @Param("lng") Double lng,
+            Pageable pageable);
 
     @Query(
             value = """
@@ -72,7 +89,8 @@ public interface BookmarkRepository extends JpaRepository<BookmarkEntity, Bookma
                   l.campus as campus,
                   l.status::text as status,
                   l.created_at as listingCreatedAt,
-                  b.created_at as bookmarkedAt
+                  b.created_at as bookmarkedAt,
+                  null::float8 as distanceMeters
                 from bookmarks b
                 join listings l on l.id = b.listing_id
                 where b.user_id = :userId and b.listing_id = :listingId

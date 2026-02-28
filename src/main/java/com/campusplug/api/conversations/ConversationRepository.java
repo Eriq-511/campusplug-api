@@ -26,6 +26,12 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
 
         String getCounterpartFullName();
 
+        String getCounterpartEmail();
+
+        String getCounterpartPhoneNumber();
+
+        String getCounterpartLocationText();
+
         String getLastMessageBody();
 
         Instant getLastMessageAt();
@@ -39,6 +45,9 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
                   l.title as listingTitle,
                   case when c.buyer_user_id = :userId then c.seller_user_id else c.buyer_user_id end as counterpartUserId,
                   u.full_name as counterpartFullName,
+                  u.email as counterpartEmail,
+                  u.phone_number as counterpartPhoneNumber,
+                  coalesce(u.registered_location_text, u.alternate_location_text) as counterpartLocationText,
                   m.body as lastMessageBody,
                   m.created_at as lastMessageAt
                 from conversations c

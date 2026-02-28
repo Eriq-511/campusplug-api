@@ -32,9 +32,11 @@ public class BookmarkController {
     @GetMapping
     public BookmarkPageResponse list(
             Authentication authentication,
+            @RequestParam(name = "lat", required = false) Double lat,
+            @RequestParam(name = "lng", required = false) Double lng,
             @RequestParam(name = "page", required = false, defaultValue = "0") int page,
             @RequestParam(name = "size", required = false, defaultValue = "20") int size) {
-        return bookmarkService.list(authentication.getName(), page, size);
+        return bookmarkService.list(authentication.getName(), lat, lng, page, size);
     }
 
     @DeleteMapping

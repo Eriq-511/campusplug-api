@@ -8,6 +8,9 @@ public record ConversationListItemResponse(
         String listingTitle,
         Long counterpartUserId,
         String counterpartFullName,
+        String counterpartEmail,
+        String counterpartPhoneNumber,
+        String counterpartLocationText,
         String lastMessageBody,
         Instant lastMessageAt,
         Boolean counterpartActiveNow

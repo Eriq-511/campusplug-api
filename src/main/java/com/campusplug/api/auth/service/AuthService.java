@@ -221,7 +221,7 @@ public class AuthService {
         }
 
         return new ForgotPasswordResponse(
-                "If the email exists, a 6-digit reset code will be sent to it.",
+                "If the email exists, a 5-digit reset code will be sent to it.",
                 devOtp
         );
     }

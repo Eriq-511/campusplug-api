@@ -60,11 +60,11 @@ public class BookmarkService {
         return getBookmark(user.getId(), listingId);
     }
 
-    public BookmarkPageResponse list(String userEmail, int page, int size) {
+public BookmarkPageResponse list(String userEmail, Double lat, Double lng, int page, int size) {
         UserEntity user = getUserOrThrow(userEmail);
         Pageable pageable = PageRequest.of(clampPage(page), clampSize(size));
 
-        Page<BookmarkRepository.BookmarkListingProjection> result = bookmarkRepository.findBookmarks(user.getId(), pageable);
+        Page<BookmarkRepository.BookmarkListingProjection> result = bookmarkRepository.findBookmarks(user.getId(), lat, lng, pageable);
         List<Long> ids = result.getContent().stream().map(BookmarkRepository.BookmarkListingProjection::getListingId).toList();
         Map<Long, String> primaryImages = loadPrimaryImages(ids);
 
@@ -80,7 +80,8 @@ public class BookmarkService {
                         primaryImages.get(r.getListingId()),
                         r.getListingCreatedAt(),
                         r.getStatus(),
-                        r.getBookmarkedAt()
+                        r.getBookmarkedAt(),
+                        r.getDistanceMeters()
                 ))
                 .toList();
 
@@ -112,7 +113,8 @@ public class BookmarkService {
                 primaryImages.get(listingId),
                 r.getListingCreatedAt(),
                 r.getStatus(),
-                r.getBookmarkedAt()
+                r.getBookmarkedAt(),
+                null  // no lat/lng context on add
         );
     }
 

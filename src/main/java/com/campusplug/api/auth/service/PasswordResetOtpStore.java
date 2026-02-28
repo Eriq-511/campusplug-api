@@ -23,9 +23,9 @@ public class PasswordResetOtpStore {
         this.redisTemplate = redisTemplate;
     }
 
-    /** Generates, stores and returns a 6-digit OTP for the given email. */
+    /** Generates, stores and returns a 5-digit OTP for the given email (matches the 5-box UI). */
     public String createOtp(String email) {
-        String otp = String.format("%06d", RANDOM.nextInt(1_000_000));
+        String otp = String.format("%05d", RANDOM.nextInt(100_000));
         redisTemplate.opsForValue().set(key(email), otp, OTP_TTL);
         return otp;
     }
