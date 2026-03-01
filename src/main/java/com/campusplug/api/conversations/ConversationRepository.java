@@ -1,5 +1,8 @@
 package com.campusplug.api.conversations;
 
+import java.time.Instant;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,12 +11,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.Optional;
-
 public interface ConversationRepository extends JpaRepository<ConversationEntity, Long> {
 
-    Optional<ConversationEntity> findByListingIdAndBuyerUserIdAndSellerUserId(Long listingId, Long buyerUserId, Long sellerUserId);
+    Optional<ConversationEntity> findByListingIdAndInquirerUserIdAndPosterUserId(Long listingId, Long inquirerUserId, Long posterUserId);
 
     interface ConversationListItemProjection {
         Long getId();
@@ -43,7 +43,7 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
                   c.id as id,
                   c.listing_id as listingId,
                   l.title as listingTitle,
-                  case when c.buyer_user_id = :userId then c.seller_user_id else c.buyer_user_id end as counterpartUserId,
+                  case when c.inquirer_user_id = :userId then c.poster_user_id else c.inquirer_user_id end as counterpartUserId,
                   u.full_name as counterpartFullName,
                   u.email as counterpartEmail,
                   u.phone_number as counterpartPhoneNumber,
@@ -52,7 +52,7 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
                   m.created_at as lastMessageAt
                 from conversations c
                 join listings l on l.id = c.listing_id
-                join users u on u.id = (case when c.buyer_user_id = :userId then c.seller_user_id else c.buyer_user_id end)
+                join users u on u.id = (case when c.inquirer_user_id = :userId then c.poster_user_id else c.inquirer_user_id end)
                 left join lateral (
                   select body, created_at
                   from messages
@@ -60,13 +60,13 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
                   order by id desc
                   limit 1
                 ) m on true
-                where c.buyer_user_id = :userId or c.seller_user_id = :userId
+                where c.inquirer_user_id = :userId or c.poster_user_id = :userId
                 order by coalesce(m.created_at, c.updated_at) desc, c.id desc
                 """,
             countQuery = """
                 select count(*)
                 from conversations c
-                where c.buyer_user_id = :userId or c.seller_user_id = :userId
+                where c.inquirer_user_id = :userId or c.poster_user_id = :userId
                 """,
             nativeQuery = true
     )
@@ -77,7 +77,7 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
                 select c.*
                 from conversations c
                 where c.id = :conversationId
-                  and (c.buyer_user_id = :userId or c.seller_user_id = :userId)
+                  and (c.inquirer_user_id = :userId or c.poster_user_id = :userId)
                 """,
             nativeQuery = true
     )

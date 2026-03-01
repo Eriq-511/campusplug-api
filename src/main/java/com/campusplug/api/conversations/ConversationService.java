@@ -47,19 +47,22 @@ public class ConversationService {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATE", "Listing must be ACTIVE");
         }
 
-        Long sellerUserId = listing.getOwnerUserId();
-        Long buyerUserId = me.getId();
-        if (buyerUserId.equals(sellerUserId)) {
+        // posterUserId: the student who posted the listing
+        // inquirerUserId: the student initiating contact (interested in the listing)
+        // Neither label is a permanent role — both students can be on either side in other conversations.
+        Long posterUserId = listing.getOwnerUserId();
+        Long inquirerUserId = me.getId();
+        if (inquirerUserId.equals(posterUserId)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "CANNOT_MESSAGE_SELF", "Cannot start a conversation with yourself");
         }
 
         return conversationRepository
-                .findByListingIdAndBuyerUserIdAndSellerUserId(listingId, buyerUserId, sellerUserId)
+                .findByListingIdAndInquirerUserIdAndPosterUserId(listingId, inquirerUserId, posterUserId)
                 .orElseGet(() -> {
                     ConversationEntity c = new ConversationEntity();
                     c.setListingId(listingId);
-                    c.setBuyerUserId(buyerUserId);
-                    c.setSellerUserId(sellerUserId);
+                    c.setInquirerUserId(inquirerUserId);
+                    c.setPosterUserId(posterUserId);
                     return conversationRepository.save(c);
                 });
     }

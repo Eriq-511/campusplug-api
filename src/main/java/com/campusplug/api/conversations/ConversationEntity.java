@@ -22,11 +22,15 @@ public class ConversationEntity {
     @Column(name = "listing_id")
     private Long listingId;
 
-    @Column(name = "buyer_user_id", nullable = false)
-    private Long buyerUserId;
+    // The student who initiated contact about the listing (role-neutral: they may also
+    // post their own listings in other conversations)
+    @Column(name = "inquirer_user_id", nullable = false)
+    private Long inquirerUserId;
 
-    @Column(name = "seller_user_id", nullable = false)
-    private Long sellerUserId;
+    // The student who posted the listing (role-neutral: they may also inquire about
+    // other listings in other conversations)
+    @Column(name = "poster_user_id", nullable = false)
+    private Long posterUserId;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -64,20 +68,20 @@ public class ConversationEntity {
         this.listingId = listingId;
     }
 
-    public Long getBuyerUserId() {
-        return buyerUserId;
+    public Long getInquirerUserId() {
+        return inquirerUserId;
     }
 
-    public void setBuyerUserId(Long buyerUserId) {
-        this.buyerUserId = buyerUserId;
+    public void setInquirerUserId(Long inquirerUserId) {
+        this.inquirerUserId = inquirerUserId;
     }
 
-    public Long getSellerUserId() {
-        return sellerUserId;
+    public Long getPosterUserId() {
+        return posterUserId;
     }
 
-    public void setSellerUserId(Long sellerUserId) {
-        this.sellerUserId = sellerUserId;
+    public void setPosterUserId(Long posterUserId) {
+        this.posterUserId = posterUserId;
     }
 
     public Instant getCreatedAt() {
