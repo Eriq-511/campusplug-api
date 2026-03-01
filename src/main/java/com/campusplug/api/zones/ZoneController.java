@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/api/v1/zones", "/zones"})
+@RequestMapping({"/api/v1/zones", "/api/zones", "/zones"})
 public class ZoneController {
 
     private final ZoneRepository zoneRepository;

@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/api/v1/location", "/location"})
+@RequestMapping({"/api/v1/location", "/api/location", "/location"})
 public class LocationController {
 
     private final LocationCheckService locationCheckService;

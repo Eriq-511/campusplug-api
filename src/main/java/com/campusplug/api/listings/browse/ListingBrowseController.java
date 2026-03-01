@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping({"/api/v1/listings", "/listings"})
+@RequestMapping({"/api/v1/listings", "/api/listings", "/listings"})
 public class ListingBrowseController {
 
     private final ListingBrowseService browseService;
