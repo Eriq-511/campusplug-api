@@ -1,6 +1,7 @@
 package com.campusplug.api.conversations;
 
 import com.campusplug.api.conversations.dto.ConversationPageResponse;
+import com.campusplug.api.conversations.dto.ConversationResponse;
 import com.campusplug.api.conversations.dto.CreateConversationRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
@@ -22,7 +23,7 @@ public class ConversationController {
     }
 
     @PostMapping
-    public ConversationEntity create(Authentication authentication, @Valid @RequestBody CreateConversationRequest request) {
+    public ConversationResponse create(Authentication authentication, @Valid @RequestBody CreateConversationRequest request) {
         return conversationService.createOrGet(authentication.getName(), request.listingId());
     }
 

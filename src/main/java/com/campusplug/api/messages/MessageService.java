@@ -60,7 +60,11 @@ public class MessageService {
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Listing not found"));
 
             if (listing.getStatus() == ListingStatus.SOLD) {
-                throw new ApiException(HttpStatus.CONFLICT, "LISTING_SOLD", "Cannot send messages for SOLD listings");
+                throw new ApiException(HttpStatus.CONFLICT, "LISTING_SOLD", "Cannot send messages for a sold listing");
+            }
+            // A deleted listing is also no longer available — block new messages symmetrically
+            if (listing.getStatus() == ListingStatus.DELETED) {
+                throw new ApiException(HttpStatus.CONFLICT, "LISTING_UNAVAILABLE", "Cannot send messages for a deleted listing");
             }
         }
 

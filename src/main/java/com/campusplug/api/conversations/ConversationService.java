@@ -3,6 +3,7 @@ package com.campusplug.api.conversations;
 import com.campusplug.api.common.ApiException;
 import com.campusplug.api.conversations.dto.ConversationListItemResponse;
 import com.campusplug.api.conversations.dto.ConversationPageResponse;
+import com.campusplug.api.conversations.dto.ConversationResponse;
 import com.campusplug.api.listings.ListingEntity;
 import com.campusplug.api.listings.ListingRepository;
 import com.campusplug.api.listings.ListingStatus;
@@ -37,7 +38,7 @@ public class ConversationService {
     }
 
     @Transactional
-    public ConversationEntity createOrGet(String email, Long listingId) {
+    public ConversationResponse createOrGet(String email, Long listingId) {
         UserRepository.UserProfileProjection me = requireUser(email);
 
         ListingEntity listing = listingRepository.findById(listingId)
@@ -56,7 +57,7 @@ public class ConversationService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "CANNOT_MESSAGE_SELF", "Cannot start a conversation with yourself");
         }
 
-        return conversationRepository
+        ConversationEntity conv = conversationRepository
                 .findByListingIdAndInquirerUserIdAndPosterUserId(listingId, inquirerUserId, posterUserId)
                 .orElseGet(() -> {
                     ConversationEntity c = new ConversationEntity();
@@ -65,6 +66,16 @@ public class ConversationService {
                     c.setPosterUserId(posterUserId);
                     return conversationRepository.save(c);
                 });
+
+        return new ConversationResponse(
+                conv.getId(),
+                conv.getListingId(),
+                listing.getTitle(),
+                conv.getInquirerUserId(),
+                conv.getPosterUserId(),
+                conv.getCreatedAt(),
+                conv.getUpdatedAt()
+        );
     }
 
     @Transactional(readOnly = true)

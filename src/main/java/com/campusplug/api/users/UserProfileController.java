@@ -2,12 +2,14 @@ package com.campusplug.api.users;
 
 import com.campusplug.api.users.dto.UpdateUserProfileRequest;
 import com.campusplug.api.users.dto.UserProfileResponse;
+import com.campusplug.api.users.dto.PublicUserProfileResponse;
 import com.campusplug.api.users.dto.UpdateLocationRequest;
 import com.campusplug.api.users.dto.FcmTokenRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +30,16 @@ public class UserProfileController {
     @GetMapping("/profile")
     public UserProfileResponse getProfile(Authentication authentication) {
         return userProfileService.getProfile(authentication.getName());
+    }
+
+    /**
+     * Public profile for any user by ID — safe to expose to any authenticated student.
+     * Used by the browse flow so a student can see who posted a listing before
+     * committing to starting a conversation.
+     */
+    @GetMapping("/{id}/public")
+    public PublicUserProfileResponse getPublicProfile(@PathVariable("id") Long id) {
+        return userProfileService.getPublicProfile(id);
     }
 
     @PutMapping("/profile")

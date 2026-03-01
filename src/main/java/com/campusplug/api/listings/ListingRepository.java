@@ -57,6 +57,9 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
         Instant getCreatedAt();
 
         Double getDistanceMeters();
+
+        // Poster's display name — shown on browse cards so viewers know who listed the item
+        String getOwnerFullName();
         }
 
         @Query(
@@ -71,8 +74,10 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
                    l.campus as campus,
                    l.status::text as status,
                    l.created_at as createdAt,
-                   null::double precision as distanceMeters
+                   null::double precision as distanceMeters,
+                   u.full_name as ownerFullName
                 from listings l
+                join users u on u.id = l.owner_user_id
                 where l.status = 'ACTIVE'
                   and l.search_tsv @@ plainto_tsquery('simple', :query)
                   and (:categoryCode is null or l.category_code = :categoryCode)
@@ -118,8 +123,10 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
                    ST_Distance(
                        l.geo,
                        ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
-                   ) as distanceMeters
+                   ) as distanceMeters,
+                   u.full_name as ownerFullName
                 from listings l
+                join users u on u.id = l.owner_user_id
                 where l.status = 'ACTIVE'
                   and l.geo is not null
                   and ST_DWithin(
@@ -200,6 +207,9 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
            nativeQuery = true)
     long countByZoneTagAndStatus(@Param("zoneTag") String zoneTag, @Param("status") String status);
 
+    // Count active listings for a given owner — used by the public profile endpoint
+    long countByOwnerUserIdAndStatus(Long ownerUserId, ListingStatus status);
+
     // G9 — listings in a specific zone sorted by proximity
     @Query(value = """
             select l.id as id,
@@ -212,8 +222,10 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
                    l.campus as campus,
                    l.status::text as status,
                    l.created_at as createdAt,
-                   ST_Distance(l.geo, ST_MakePoint(:lng, :lat)::geography) as distanceMeters
+                   ST_Distance(l.geo, ST_MakePoint(:lng, :lat)::geography) as distanceMeters,
+                   u.full_name as ownerFullName
             from listings l
+            join users u on u.id = l.owner_user_id
             where l.zone_tag = :zoneTag
               and l.status = 'ACTIVE'
               and l.geo is not null
@@ -244,8 +256,10 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
                    l.created_at as createdAt,
                    case when l.geo is not null
                         then ST_Distance(l.geo, ST_MakePoint(:lng, :lat)::geography)
-                        else null end as distanceMeters
+                        else null end as distanceMeters,
+                   u.full_name as ownerFullName
             from listings l
+            join users u on u.id = l.owner_user_id
             where l.status = 'ACTIVE'
             order by distanceMeters asc nulls last, l.created_at desc, l.id desc
             """,

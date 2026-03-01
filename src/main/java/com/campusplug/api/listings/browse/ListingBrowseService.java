@@ -132,7 +132,8 @@ public class ListingBrowseService {
                         r.getCampus(),
                         primaryImageByListingId.get(r.getId()),
                         r.getCreatedAt(),
-                        r.getDistanceMeters()
+                        r.getDistanceMeters(),
+                        r.getOwnerFullName()
                 ))
                     .collect(Collectors.toList());
 

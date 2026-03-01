@@ -1,6 +1,9 @@
 package com.campusplug.api.users;
 
 import com.campusplug.api.common.ApiException;
+import com.campusplug.api.listings.ListingRepository;
+import com.campusplug.api.listings.ListingStatus;
+import com.campusplug.api.users.dto.PublicUserProfileResponse;
 import com.campusplug.api.users.dto.RegisteredLocationDto;
 import com.campusplug.api.users.dto.UpdateLocationRequest;
 import com.campusplug.api.users.dto.UpdateUserProfileRequest;
@@ -18,9 +21,11 @@ public class UserProfileService {
     private static final Pattern E164 = Pattern.compile("^\\+[1-9]\\d{7,14}$");
 
     private final UserRepository userRepository;
+    private final ListingRepository listingRepository;
 
-    public UserProfileService(UserRepository userRepository) {
+    public UserProfileService(UserRepository userRepository, ListingRepository listingRepository) {
         this.userRepository = userRepository;
+        this.listingRepository = listingRepository;
     }
 
     public UserProfileResponse getProfile(String email) {
@@ -148,6 +153,23 @@ public class UserProfileService {
 
     private static String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Returns the publicly visible profile for any user by ID.
+     * Safe to expose to any authenticated student — no credentials or device tokens.
+     */
+    public PublicUserProfileResponse getPublicProfile(Long userId) {
+        UserRepository.PublicUserProjection p = userRepository.findPublicById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "User not found"));
+        long activeListings = listingRepository.countByOwnerUserIdAndStatus(userId, ListingStatus.ACTIVE);
+        return new PublicUserProfileResponse(
+                p.getId(),
+                p.getFullName(),
+                p.getCampus(),
+                activeListings,
+                p.getCreatedAt()
+        );
     }
 
     // G3 — update live device location

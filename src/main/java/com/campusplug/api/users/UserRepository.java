@@ -1,5 +1,6 @@
 package com.campusplug.api.users;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -138,4 +139,23 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
         @Param("radiusMeters") double radiusMeters);
 
     boolean existsByRegistrationNumber(String registrationNumber);
+
+    // Public-facing projection: never exposes password hash, FCM token, or
+    // geo coordinates. Safe to return to any authenticated student.
+    interface PublicUserProjection {
+        Long getId();
+        String getFullName();
+        String getCampus();
+        Instant getCreatedAt();
+    }
+
+    @Query(value = """
+            select u.id        as id,
+                   u.full_name as fullName,
+                   u.campus    as campus,
+                   u.created_at as createdAt
+            from users u
+            where u.id = :id
+            """, nativeQuery = true)
+    Optional<PublicUserProjection> findPublicById(@Param("id") Long id);
 }

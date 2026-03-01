@@ -12,6 +12,9 @@ public record ListingCardResponse(
         String campus,
         String primaryImageUrl,
         Instant createdAt,
-        Double distanceMeters
+        Double distanceMeters,
+        // Poster's display name — shown directly on the card so browsers see peer identity
+        // without needing to open the listing first. Reinforces the P2P model.
+        String ownerFullName
 ) {
 }
