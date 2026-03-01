@@ -22,6 +22,7 @@ import com.campusplug.api.listings.images.ListingImageRepository;
 import com.campusplug.api.listings.images.dto.AttachListingImageRequest;
 import com.campusplug.api.listings.images.dto.ListingImageResponse;
 import com.campusplug.api.realtime.ListingsRealtimePublisher;
+import com.campusplug.api.realtime.PushNotificationService;
 import com.campusplug.api.users.UserRepository;
 
 @Service
@@ -32,18 +33,21 @@ public class ListingService {
     private final ListingImageRepository listingImageRepository;
     private final CacheEvictionService cacheEvictionService;
     private final ListingsRealtimePublisher listingsRealtimePublisher;
+    private final PushNotificationService pushNotificationService;
 
     public ListingService(
             ListingRepository listingRepository,
             UserRepository userRepository,
             ListingImageRepository listingImageRepository,
             CacheEvictionService cacheEvictionService,
-            ListingsRealtimePublisher listingsRealtimePublisher) {
+            ListingsRealtimePublisher listingsRealtimePublisher,
+            PushNotificationService pushNotificationService) {
         this.listingRepository = listingRepository;
         this.userRepository = userRepository;
         this.listingImageRepository = listingImageRepository;
         this.cacheEvictionService = cacheEvictionService;
         this.listingsRealtimePublisher = listingsRealtimePublisher;
+        this.pushNotificationService = pushNotificationService;
     }
 
     @Transactional
@@ -115,6 +119,8 @@ public class ListingService {
 
         if (loc.lat() != null && loc.lng() != null) {
             listingRepository.updateGeo(saved.getId(), loc.lat(), loc.lng());
+            // G9 — auto-tag listing with zone polygon it falls inside (fire-and-forget if no zone)
+            listingRepository.autoTagZone(saved.getId(), loc.lat(), loc.lng());
         } else {
             listingRepository.clearGeo(saved.getId());
         }
@@ -123,6 +129,10 @@ public class ListingService {
         ListingEntity active = listingRepository.save(saved);
         cacheEvictionService.evictListingsReadCaches();
         listingsRealtimePublisher.publishListingNew(active);
+        // G4 — async FCM push to nearby users (non-blocking)
+        if (loc.lat() != null && loc.lng() != null) {
+            pushNotificationService.notifyNearbyUsersWithCoords(active, loc.lat(), loc.lng());
+        }
         return toResponse(active, List.of());
     }
 

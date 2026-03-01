@@ -2,8 +2,8 @@ package com.campusplug.api.users;
 
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,6 +97,45 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
             where id = :userId
             """, nativeQuery = true)
     int clearAlternateGeo(@Param("userId") Long userId);
+
+    // G3 — update live location
+    @Transactional
+    @Modifying
+    @Query(value = """
+            update users
+            set last_known_lat  = :lat,
+                last_known_lng  = :lng,
+                last_geo        = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
+                last_location_at = now(),
+                updated_at      = now()
+            where id = :userId
+            """, nativeQuery = true)
+    int updateLastLocation(@Param("userId") Long userId, @Param("lat") double lat, @Param("lng") double lng);
+
+    // G4 — FCM token management
+    @Transactional
+    @Modifying
+    @Query(value = "update users set fcm_token = :token, updated_at = now() where id = :userId",
+           nativeQuery = true)
+    int updateFcmToken(@Param("userId") Long userId, @Param("token") String token);
+
+    @Transactional
+    @Modifying
+    @Query(value = "update users set fcm_token = null, updated_at = now() where id = :userId",
+           nativeQuery = true)
+    int clearFcmToken(@Param("userId") Long userId);
+
+    // G4 — Find users near a point who have an FCM token (for push notifications)
+    @Query(value = """
+            select * from users
+            where last_geo is not null
+              and fcm_token is not null
+              and ST_DWithin(last_geo, ST_MakePoint(:lng, :lat)::geography, :radiusMeters)
+            """, nativeQuery = true)
+    java.util.List<UserEntity> findUsersNearPoint(
+        @Param("lat") double lat,
+        @Param("lng") double lng,
+        @Param("radiusMeters") double radiusMeters);
 
     boolean existsByRegistrationNumber(String registrationNumber);
 }

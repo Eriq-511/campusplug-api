@@ -2,6 +2,7 @@ package com.campusplug.api.users;
 
 import com.campusplug.api.common.ApiException;
 import com.campusplug.api.users.dto.RegisteredLocationDto;
+import com.campusplug.api.users.dto.UpdateLocationRequest;
 import com.campusplug.api.users.dto.UpdateUserProfileRequest;
 import com.campusplug.api.users.dto.UserProfileResponse;
 import org.springframework.http.HttpStatus;
@@ -147,6 +148,22 @@ public class UserProfileService {
 
     private static String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    // G3 — update live device location
+    @Transactional
+    public void updateLastLocation(String email, UpdateLocationRequest req) {
+        UserEntity user = userRepository.findByEmailIgnoreCase(normalizeEmail(email))
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not found"));
+        userRepository.updateLastLocation(user.getId(), req.getLat(), req.getLng());
+    }
+
+    // G4 — store FCM push token
+    @Transactional
+    public void updateFcmToken(String email, String token) {
+        UserEntity user = userRepository.findByEmailIgnoreCase(normalizeEmail(email))
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not found"));
+        userRepository.updateFcmToken(user.getId(), token);
     }
 
     private static String normalizePhone(String phone) {

@@ -85,6 +85,36 @@ public class ListingBrowseService {
         return toPageResponse(result, pageable);
     }
 
+    /** G9 — listings in a specific zone sorted by proximity */
+    public ListingPageResponse byZone(
+            String zoneTag,
+            double lat,
+            double lng,
+            int page,
+            int size) {
+        Pageable pageable = PageRequest.of(clampPage(page), clampSize(size));
+        Page<ListingRepository.ListingCardProjection> result =
+                listingRepository.findByZoneTagActive(zoneTag, lat, lng, pageable);
+        return toPageResponse(result, pageable);
+    }
+
+    /** G9 — fast count for notification badge */
+    public long countByZone(String zoneTag) {
+        return listingRepository.countByZoneTagAndStatus(zoneTag, "ACTIVE");
+    }
+
+    /** G9 — global distance-sorted feed */
+    public ListingPageResponse allByDistance(
+            double lat,
+            double lng,
+            int page,
+            int size) {
+        Pageable pageable = PageRequest.of(clampPage(page), clampSize(size));
+        Page<ListingRepository.ListingCardProjection> result =
+                listingRepository.findAllActiveByDistance(lat, lng, pageable);
+        return toPageResponse(result, pageable);
+    }
+
     private ListingPageResponse toPageResponse(Page<ListingRepository.ListingCardProjection> page, Pageable pageable) {
         List<Long> ids = page.getContent().stream()
             .map(ListingRepository.ListingCardProjection::getId)

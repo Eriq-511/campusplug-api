@@ -43,6 +43,20 @@ public class UserEntity {
     @Column(name = "alternate_location_text")
     private String alternateLocationText;
 
+    // G3 — last known live location (updated by PUT /api/v1/users/location)
+    @Column(name = "last_known_lat")
+    private Double lastKnownLat;
+
+    @Column(name = "last_known_lng")
+    private Double lastKnownLng;
+
+    @Column(name = "last_location_at")
+    private Instant lastLocationAt;
+
+    // G4 — FCM device token for push notifications
+    @Column(name = "fcm_token")
+    private String fcmToken;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -133,6 +147,38 @@ public class UserEntity {
 
     public void setAlternateLocationText(String alternateLocationText) {
         this.alternateLocationText = alternateLocationText;
+    }
+
+    public Double getLastKnownLat() {
+        return lastKnownLat;
+    }
+
+    public void setLastKnownLat(Double lastKnownLat) {
+        this.lastKnownLat = lastKnownLat;
+    }
+
+    public Double getLastKnownLng() {
+        return lastKnownLng;
+    }
+
+    public void setLastKnownLng(Double lastKnownLng) {
+        this.lastKnownLng = lastKnownLng;
+    }
+
+    public Instant getLastLocationAt() {
+        return lastLocationAt;
+    }
+
+    public void setLastLocationAt(Instant lastLocationAt) {
+        this.lastLocationAt = lastLocationAt;
+    }
+
+    public String getFcmToken() {
+        return fcmToken;
+    }
+
+    public void setFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
     }
 
     public Instant getCreatedAt() {

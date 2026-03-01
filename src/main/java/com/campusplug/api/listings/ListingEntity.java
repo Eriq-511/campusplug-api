@@ -45,6 +45,10 @@ public class ListingEntity {
     @Column(name = "campus")
     private String campus;
 
+    // G9 — zone tag auto-assigned when listing is created near a campus zone
+    @Column(name = "zone_tag")
+    private String zoneTag;
+
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "status", nullable = false, columnDefinition = "listing_status")
     private ListingStatus status;
@@ -139,6 +143,14 @@ public class ListingEntity {
 
     public void setCampus(String campus) {
         this.campus = campus;
+    }
+
+    public String getZoneTag() {
+        return zoneTag;
+    }
+
+    public void setZoneTag(String zoneTag) {
+        this.zoneTag = zoneTag;
     }
 
     public ListingStatus getStatus() {

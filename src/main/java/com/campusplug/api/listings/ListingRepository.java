@@ -175,4 +175,81 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
             where id = :listingId
             """, nativeQuery = true)
     int clearGeo(@Param("listingId") Long listingId);
+
+    // G9 — auto-tag listing with the zone polygon it falls inside
+    @Transactional
+    @Modifying
+    @Query(value = """
+            update listings
+            set zone_tag = (
+                select tag from zones
+                where ST_Contains(boundary, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326))
+                limit 1
+            )
+            where id = :listingId
+            """, nativeQuery = true)
+    int autoTagZone(@Param("listingId") Long listingId,
+                    @Param("lat") double lat,
+                    @Param("lng") double lng);
+
+    // G9 — count active listings in a zone (used by LocationCheckService)
+    @Query(value = "select count(*) from listings where zone_tag = :zoneTag and status = :status",
+           nativeQuery = true)
+    long countByZoneTagAndStatus(@Param("zoneTag") String zoneTag, @Param("status") String status);
+
+    // G9 — listings in a specific zone sorted by proximity
+    @Query(value = """
+            select l.id as id,
+                   l.owner_user_id as ownerUserId,
+                   l.title as title,
+                   l.price_ugx as priceUgx,
+                   l.currency as currency,
+                   l.category_code as categoryCode,
+                   l.location_text as locationText,
+                   l.campus as campus,
+                   l.status::text as status,
+                   l.created_at as createdAt,
+                   ST_Distance(l.geo, ST_MakePoint(:lng, :lat)::geography) as distanceMeters
+            from listings l
+            where l.zone_tag = :zoneTag
+              and l.status = 'ACTIVE'
+              and l.geo is not null
+            order by distanceMeters asc, l.created_at desc, l.id desc
+            """,
+           countQuery = """
+            select count(*) from listings
+            where zone_tag = :zoneTag and status = 'ACTIVE'
+            """,
+           nativeQuery = true)
+    Page<ListingCardProjection> findByZoneTagActive(
+            @Param("zoneTag") String zoneTag,
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            Pageable pageable);
+
+    // G1/G9 — global feed sorted by distance (paginated)
+    @Query(value = """
+            select l.id as id,
+                   l.owner_user_id as ownerUserId,
+                   l.title as title,
+                   l.price_ugx as priceUgx,
+                   l.currency as currency,
+                   l.category_code as categoryCode,
+                   l.location_text as locationText,
+                   l.campus as campus,
+                   l.status::text as status,
+                   l.created_at as createdAt,
+                   case when l.geo is not null
+                        then ST_Distance(l.geo, ST_MakePoint(:lng, :lat)::geography)
+                        else null end as distanceMeters
+            from listings l
+            where l.status = 'ACTIVE'
+            order by distanceMeters asc nulls last, l.created_at desc, l.id desc
+            """,
+           countQuery = "select count(*) from listings where status = 'ACTIVE'",
+           nativeQuery = true)
+    Page<ListingCardProjection> findAllActiveByDistance(
+            @Param("lat") double lat,
+            @Param("lng") double lng,
+            Pageable pageable);
 }

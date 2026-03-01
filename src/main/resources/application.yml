@@ -55,6 +55,9 @@ app:
   google:
     maps-api-key: ${GOOGLE_MAPS_API_KEY:}
 
+  firebase:
+    service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+
   cloudinary:
     cloud-name: ${CLOUDINARY_CLOUD_NAME:}
     api-key: ${CLOUDINARY_API_KEY:}
