@@ -1,5 +1,12 @@
 package com.campusplug.api.users;
 
+import java.util.Locale;
+import java.util.regex.Pattern;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.campusplug.api.common.ApiException;
 import com.campusplug.api.listings.ListingRepository;
 import com.campusplug.api.listings.ListingStatus;
@@ -8,12 +15,7 @@ import com.campusplug.api.users.dto.RegisteredLocationDto;
 import com.campusplug.api.users.dto.UpdateLocationRequest;
 import com.campusplug.api.users.dto.UpdateUserProfileRequest;
 import com.campusplug.api.users.dto.UserProfileResponse;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Locale;
-import java.util.regex.Pattern;
+import com.campusplug.api.zones.LocationCheckService;
 
 @Service
 public class UserProfileService {
@@ -22,10 +24,14 @@ public class UserProfileService {
 
     private final UserRepository userRepository;
     private final ListingRepository listingRepository;
+    private final LocationCheckService locationCheckService;
 
-    public UserProfileService(UserRepository userRepository, ListingRepository listingRepository) {
+    public UserProfileService(UserRepository userRepository,
+                              ListingRepository listingRepository,
+                              LocationCheckService locationCheckService) {
         this.userRepository = userRepository;
         this.listingRepository = listingRepository;
+        this.locationCheckService = locationCheckService;
     }
 
     public UserProfileResponse getProfile(String email) {
@@ -178,6 +184,10 @@ public class UserProfileService {
         UserEntity user = userRepository.findByEmailIgnoreCase(normalizeEmail(email))
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not found"));
         userRepository.updateLastLocation(user.getId(), req.getLat(), req.getLng());
+
+        // Keep geofencing state in sync with the latest device location.
+        // This updates user_zones (and implicitly drives zone-based UX in the app).
+        locationCheckService.checkZone(user.getId(), req.getLat(), req.getLng());
     }
 
     // G4 — store FCM push token

@@ -38,6 +38,7 @@ public class ConversationEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @SuppressWarnings("unused")
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
@@ -47,6 +48,7 @@ public class ConversationEntity {
         updatedAt = now;
     }
 
+    @SuppressWarnings("unused")
     @PreUpdate
     void preUpdate() {
         updatedAt = Instant.now();

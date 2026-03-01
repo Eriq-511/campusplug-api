@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -28,7 +29,8 @@ public class GeoService {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "GEO_DISABLED",
                     "Google Maps API key not configured");
         }
-        String url = UriComponentsBuilder.fromHttpUrl(GEOCODE_URL)
+
+        String url = UriComponentsBuilder.fromUriString(GEOCODE_URL)
                 .queryParam("address", address)
                 .queryParam("key", mapsApiKey)
                 .toUriString();
@@ -46,8 +48,9 @@ public class GeoService {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "GEO_DISABLED",
                     "Google Maps API key not configured");
         }
+
         String latlng = lat + "," + lng;
-        String url = UriComponentsBuilder.fromHttpUrl(GEOCODE_URL)
+        String url = UriComponentsBuilder.fromUriString(GEOCODE_URL)
                 .queryParam("latlng", latlng)
                 .queryParam("key", mapsApiKey)
                 .toUriString();
@@ -56,37 +59,40 @@ public class GeoService {
         return parseReverseResponse(response, lat, lng);
     }
 
-    @SuppressWarnings("unchecked")
     private GeoResponse parseGeocodeResponse(Map<?, ?> body, String query) {
-        String status = (String) body.get("status");
+        String status = body == null ? null : (String) body.get("status");
         if (!"OK".equals(status)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "GEO_NOT_FOUND",
                     "Geocoding failed for: " + query + " (status=" + status + ")");
         }
-        java.util.List<?> results = (java.util.List<?>) body.get("results");
+
+        List<?> results = (List<?>) body.get("results");
         if (results == null || results.isEmpty()) {
             throw new ApiException(HttpStatus.NOT_FOUND, "GEO_NOT_FOUND", "No results for: " + query);
         }
+
         Map<?, ?> first = (Map<?, ?>) results.get(0);
         String formattedAddress = (String) first.get("formatted_address");
         Map<?, ?> geometry = (Map<?, ?>) first.get("geometry");
         Map<?, ?> location = (Map<?, ?>) geometry.get("location");
+
         double lat = ((Number) location.get("lat")).doubleValue();
         double lng = ((Number) location.get("lng")).doubleValue();
         return new GeoResponse(lat, lng, formattedAddress);
     }
 
-    @SuppressWarnings("unchecked")
     private GeoResponse parseReverseResponse(Map<?, ?> body, double lat, double lng) {
-        String status = (String) body.get("status");
+        String status = body == null ? null : (String) body.get("status");
         if (!"OK".equals(status)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "GEO_NOT_FOUND",
                     "Reverse geocoding failed (status=" + status + ")");
         }
-        java.util.List<?> results = (java.util.List<?>) body.get("results");
+
+        List<?> results = (List<?>) body.get("results");
         String address = (results != null && !results.isEmpty())
                 ? (String) ((Map<?, ?>) results.get(0)).get("formatted_address")
                 : "Unknown location";
+
         return new GeoResponse(lat, lng, address);
     }
 }

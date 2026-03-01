@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = CampusplugApiApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SuppressWarnings({"unused", "resource"})
 class ListingsNewWebSocketPhase9IntegrationTest {
 
     private static final DockerImageName POSTGIS_IMAGE = DockerImageName

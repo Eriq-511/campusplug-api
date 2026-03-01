@@ -38,7 +38,6 @@ public class AuthService {
     private final JwtService jwtService;
     private final RevokedTokenStore revokedTokenStore;
     private final EmailDomainValidator emailDomainValidator;
-    private final PasswordResetTokenStore passwordResetTokenStore;
     private final PasswordResetOtpStore passwordResetOtpStore;
     private final Environment environment;
     private final EmailService emailService;
@@ -51,7 +50,6 @@ public class AuthService {
             JwtService jwtService,
             RevokedTokenStore revokedTokenStore,
             EmailDomainValidator emailDomainValidator,
-            PasswordResetTokenStore passwordResetTokenStore,
             PasswordResetOtpStore passwordResetOtpStore,
             Environment environment,
             EmailService emailService,
@@ -62,7 +60,6 @@ public class AuthService {
         this.jwtService = jwtService;
         this.revokedTokenStore = revokedTokenStore;
         this.emailDomainValidator = emailDomainValidator;
-        this.passwordResetTokenStore = passwordResetTokenStore;
         this.passwordResetOtpStore = passwordResetOtpStore;
         this.environment = environment;
         this.emailService = emailService;

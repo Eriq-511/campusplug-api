@@ -85,7 +85,8 @@
                 "exec": [
                   "const json = pm.response.json();",
                   "if (json && json.token) { pm.environment.set('token', json.token); }",
-                  "if (json && json.user && json.user.email) { pm.environment.set('email', json.user.email); }"
+                  "if (json && json.user && json.user.email) { pm.environment.set('email', json.user.email); }",
+                  "if (json && json.user && json.user.id) { pm.environment.set('userId', json.user.id); pm.environment.set('publicUserId', json.user.id); }"
                 ],
                 "type": "text/javascript"
               }
@@ -102,6 +103,21 @@
               "raw": "{\n  \"email\": \"testuser123@must.ac.ug\",\n  \"password\": \"password123\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser123@must.ac.ug\",\n  \"otp\": \"{{otpCode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/verify-otp"
           }
         },
         {
@@ -180,6 +196,41 @@
               "raw": "{\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  }\n}"
             },
             "url": "{{baseUrl}}/api/v1/users/profile"
+          }
+        },
+        {
+          "name": "Get Public Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/users/{{publicUserId}}/public"
+          }
+        },
+        {
+          "name": "Update Last Location",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": {{lat}},\n  \"lng\": {{lng}}\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/users/location"
+          }
+        },
+        {
+          "name": "Update FCM Token",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"demo-fcm-token\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/users/fcm-token"
           }
         }
       ]
@@ -614,6 +665,72 @@
             "method": "GET",
             "url": "{{baseUrl}}/api/v1/listings/nearby?lat=0.329&lng=32.571&radiusKm=5&page=0&size=20"
           }
+        },
+        {
+          "name": "Zone Listings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/zone/{{zoneTag}}?lat={{lat}}&lng={{lng}}&page=0&size=20"
+          }
+        },
+        {
+          "name": "Zone Listing Count",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/zone/{{zoneTag}}/count"
+          }
+        },
+        {
+          "name": "Feed By Distance",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/listings/feed?lat={{lat}}&lng={{lng}}&page=0&size=20"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Geo",
+      "item": [
+        {
+          "name": "Forward Geocode",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/geo/geocode?address=MUST%20Mbarara"
+          }
+        },
+        {
+          "name": "Reverse Geocode",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/geo/reverse?lat={{lat}}&lng={{lng}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Zones",
+      "item": [
+        {
+          "name": "List Zones",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/zones"
+          }
+        },
+        {
+          "name": "Check Current Location Zone",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": {{lat}},\n  \"lng\": {{lng}}\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/location/check"
+          }
         }
       ]
     },
@@ -735,10 +852,10 @@
     },
     {
       "name": "Conversation Flow (2-user demo)",
-      "description": "Step-by-step: Seller creates listing, Buyer starts conversation, both exchange messages. Run in order.",
+      "description": "Step-by-step: Poster creates listing, Inquirer starts conversation, both exchange messages. Run in order.",
       "item": [
         {
-          "name": "Step 1 — Register Seller",
+          "name": "Step 1 — Register Poster",
           "event": [{
             "listen": "test",
             "script": {
@@ -758,7 +875,7 @@
           }
         },
         {
-          "name": "Step 2 — Register Buyer",
+          "name": "Step 2 — Register Inquirer",
           "event": [{
             "listen": "test",
             "script": {
@@ -778,7 +895,7 @@
           }
         },
         {
-          "name": "Step 3 — Login as Seller (sets sellerToken + token)",
+          "name": "Step 3 — Login as Poster (sets sellerToken + token)",
           "event": [{
             "listen": "test",
             "script": {
@@ -795,7 +912,7 @@
           }
         },
         {
-          "name": "Step 4 — Create Listing as Seller (sets listingId)",
+          "name": "Step 4 — Create Listing as Poster (sets listingId)",
           "event": [{
             "listen": "test",
             "script": {
@@ -814,7 +931,7 @@
           }
         },
         {
-          "name": "Step 5 — Login as Buyer (sets buyerToken + token)",
+          "name": "Step 5 — Login as Inquirer (sets buyerToken + token)",
           "event": [{
             "listen": "test",
             "script": {
@@ -831,7 +948,7 @@
           }
         },
         {
-          "name": "Step 6 — Buyer starts Conversation (sets conversationId)",
+          "name": "Step 6 — Inquirer starts Conversation (sets conversationId)",
           "event": [{
             "listen": "test",
             "script": {
@@ -850,7 +967,7 @@
           }
         },
         {
-          "name": "Step 7 — Buyer sends Message (sets messageId)",
+          "name": "Step 7 — Inquirer sends Message (sets messageId)",
           "event": [{
             "listen": "test",
             "script": {
@@ -869,7 +986,7 @@
           }
         },
         {
-          "name": "Step 8 — Seller replies",
+          "name": "Step 8 — Poster replies",
           "request": {
             "method": "POST",
             "header": [
@@ -881,7 +998,7 @@
           }
         },
         {
-          "name": "Step 9 — Seller reads messages",
+          "name": "Step 9 — Poster reads messages",
           "request": {
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],

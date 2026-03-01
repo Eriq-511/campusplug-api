@@ -1,10 +1,10 @@
 package com.campusplug.api.zones;
 
 public class ZoneResponse {
-    private Long id;
-    private String name;
-    private String tag;
-    private String accessType;
+    private final Long id;
+    private final String name;
+    private final String tag;
+    private final String accessType;
 
     public ZoneResponse(Long id, String name, String tag, String accessType) {
         this.id = id;

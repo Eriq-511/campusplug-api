@@ -1,0 +1,236 @@
+Flutter Team Handoff — Priority Recommendations (Frontend to match Backend)
+
+Goal
+- Ensure the app consistently communicates dual-role P2P behavior: every student can browse, post, and message in the same session.
+- Align frontend copy, IA, and API usage with the live backend.
+
+Priority 1 — Critical copy fixes (role neutrality)
+1) Replace all “vendor” wording in chat UI
+   - Current risky text: “Start a conversation with vendor”.
+   - Replace with: “Start a conversation with {fullName}” or “Message {fullName}”.
+   - Source of truth for names:
+     - Conversation list: counterpartFullName
+     - Browse/search cards: ownerFullName
+     - Public profile endpoint: fullName
+
+2) Update onboarding/login copy to reflect dual role
+   - Avoid buyer-only framing like “find a good deal” as the sole message.
+   - Suggested helper line: “Browse listings or post your own item anytime.”
+   - Step label “Browse” (step 3) can become neutral: “Start” or “Trade”.
+
+Priority 2 — Data-contract alignment (must implement)
+3) Render poster identity on listing cards
+   - Backend now returns ownerFullName in listing card payloads.
+   - Apply to Browse, Search Results, Nearby, Zone and Feed cards.
+   - Endpoint family:
+     - GET /api/v1/listings/search
+     - GET /api/v1/listings/nearby
+     - GET /api/v1/listings/zone/{tag}
+     - GET /api/v1/listings/feed
+
+4) Use public profile endpoint for trust cards
+   - Endpoint: GET /api/v1/users/{id}/public
+   - Returns: id, fullName, campus, activeListingsCount, memberSince
+   - Use this for profile preview sheets/pages before initiating chat.
+
+5) Keep conversation creation contract updated
+   - POST /api/v1/conversations returns role-neutral fields:
+     - id, listingId, listingTitle, inquirerUserId, posterUserId, createdAt, updatedAt
+   - Do not expect old buyerUserId/sellerUserId fields.
+
+Priority 3 — UX consistency with backend states
+6) Respect listing availability in messaging CTAs
+   - Backend blocks messaging for SOLD and DELETED listings.
+   - Error codes:
+     - LISTING_SOLD
+     - LISTING_UNAVAILABLE
+   - Frontend behavior:
+     - Disable “Chat Now/Message” for unavailable items.
+     - Show status badge and clear reason text.
+
+7) Saved Items / Bookmarks state handling
+   - Bookmark payload includes status string; use it to gate CTA.
+   - If status is SOLD/DELETED:
+     - Disable chat CTA
+     - Keep Remove enabled
+
+Priority 4 — Navigation/IA reinforcement
+8) Keep buy/sell always one tap apart
+   - Maintain persistent bottom nav (Browse/Search/Sell/Chat/Account).
+   - Add “My Conversations” visibility in Account area (if missing) to balance “My Listings”.
+
+9) Remove placeholder text in production empty states
+   - Replace “Maps API Integration Point” with production-safe empty state copy:
+     - “No items found in this category yet.”
+     - Optional secondary action: “Switch to List View”.
+
+API Field Mapping (quick reference)
+A) Listing card item (browse/search/nearby/feed/zone)
+- id
+- title
+- priceUgx
+- currency
+- categoryCode
+- locationText
+- campus
+- primaryImageUrl
+- createdAt
+- distanceMeters
+- ownerFullName   <-- new, now available
+
+B) Conversation create response
+- id
+- listingId
+- listingTitle
+- inquirerUserId
+- posterUserId
+- createdAt
+- updatedAt
+
+C) Conversation list item
+- id
+- listingId
+- listingTitle
+- counterpartUserId
+- counterpartFullName
+- counterpartEmail
+- counterpartPhoneNumber
+- counterpartLocationText
+- lastMessageBody
+- lastMessageAt
+- counterpartActiveNow
+
+D) Public user profile
+- id
+- fullName
+- campus
+- activeListingsCount
+- memberSince
+
+Implementation Order (suggested sprint sequence)
+1. Copy updates (“vendor” removal + onboarding/login dual-role language)
+2. Listing cards consume ownerFullName everywhere
+3. Wire public profile endpoint and profile preview UI
+4. Update conversation create parser to inquirer/poster fields
+5. Enforce SOLD/DELETED CTA gating in all listing/bookmark/chat entry points
+6. Clean map/search empty states
+
+Acceptance Checklist
+- No “vendor” label appears in app UI.
+- A user can go Browse -> Sell -> Chat without role switches/settings.
+- Listing cards consistently show poster name.
+- Chat CTA disabled for SOLD/DELETED items and shows clear reason.
+- Public profile preview loads from /api/v1/users/{id}/public.
+- Conversation creation works using inquirer/poster fields.
+
+Notes
+- Backend is already aligned to the P2P dual-role model and passing tests.
+- This file focuses on frontend behavior needed to prevent role-split perception.
+
+Flutter DTO/Model Update Patch List (compact)
+
+1) ListingCardModel (Browse/Search/Nearby/Zone/Feed)
+- Add field:
+   - ownerFullName: String?
+- Ensure JSON parse includes:
+   - ownerFullName <- json['ownerFullName']
+
+2) ConversationCreateResponseModel
+- Replace old role fields (if present):
+   - remove buyerUserId
+   - remove sellerUserId
+- Use new fields:
+   - inquirerUserId <- json['inquirerUserId']
+   - posterUserId   <- json['posterUserId']
+- Keep:
+   - id, listingId, listingTitle, createdAt, updatedAt
+
+3) PublicUserProfileModel (new)
+- Create model with fields:
+   - id: int
+   - fullName: String
+   - campus: String?
+   - activeListingsCount: int
+   - memberSince: DateTime
+- Endpoint:
+   - GET /api/v1/users/{id}/public
+
+4) BookmarkCardModel (Saved Items)
+- Keep existing status parsing and ensure CTA logic maps:
+   - ACTIVE  => Chat enabled
+   - SOLD    => Chat disabled
+   - DELETED => Chat disabled
+
+5) Message/Conversation UI labels (not model but mandatory)
+- Replace hardcoded “vendor” strings with:
+   - counterpartFullName (conversation list)
+   - ownerFullName (listing card)
+   - Public profile fullName (profile preview)
+
+Screen-to-Endpoint Contract Map
+
+A) Browse Home + Search Results + Category List View
+- Endpoint(s):
+   - GET /api/v1/listings/feed
+   - GET /api/v1/listings/search
+   - GET /api/v1/listings/nearby
+   - GET /api/v1/listings/zone/{tag}
+- Must render from payload:
+   - title, priceUgx, locationText/campus, primaryImageUrl, ownerFullName
+
+B) Listing Card “Message/Chat Now” action
+- Flow:
+   1. POST /api/v1/conversations { listingId }
+   2. Navigate to chat screen using returned conversation id
+- Handle conflict errors:
+   - LISTING_SOLD
+   - LISTING_UNAVAILABLE
+
+C) Chat List Screen
+- Endpoint:
+   - GET /api/v1/conversations?page=&size=
+- Use:
+   - counterpartFullName, lastMessageBody, lastMessageAt, counterpartActiveNow
+
+D) Chat Thread Screen
+- Endpoints:
+   - GET /api/v1/conversations/{conversationId}/messages?limit=
+   - GET /api/v1/conversations/{conversationId}/messages/long-poll?afterMessageId=&timeoutSeconds=
+   - POST /api/v1/conversations/{conversationId}/messages
+
+E) Poster Preview / Trust Sheet
+- Endpoint:
+   - GET /api/v1/users/{id}/public
+- Show:
+   - fullName, campus, activeListingsCount, memberSince
+
+F) My Listings Screen
+- Endpoint:
+   - GET /api/v1/listings/my?status=ALL|ACTIVE|SOLD|DELETED
+- Use status + actions to drive buttons:
+   - ACTIVE  => Edit/Delete/Sell
+   - SOLD    => Read-only sold state
+   - DELETED => Restore/Purge
+
+Quick Parsing Snippets (pseudo)
+
+ListingCardModel.fromJson
+- ownerFullName: json['ownerFullName'] as String?
+
+ConversationCreateResponse.fromJson
+- inquirerUserId: json['inquirerUserId'] as int
+- posterUserId: json['posterUserId'] as int
+
+PublicUserProfile.fromJson
+- id: json['id'] as int
+- fullName: json['fullName'] as String
+- campus: json['campus'] as String?
+- activeListingsCount: json['activeListingsCount'] as int
+- memberSince: DateTime.parse(json['memberSince'] as String)
+
+Definition of Done (frontend)
+- No old buyerUserId/sellerUserId parsing remains.
+- No “vendor” text remains in UI copy.
+- ownerFullName is visible on all listing cards.
+- Public profile endpoint is wired and visible from listing/chat context.
+- SOLD and DELETED states disable chat CTA everywhere consistently.

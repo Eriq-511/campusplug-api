@@ -1,5 +1,10 @@
 package com.campusplug.api.listings;
 
+import java.time.Instant;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -8,10 +13,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
-import java.time.Instant;
 
 @Entity
 @Table(name = "listings")
@@ -59,6 +60,7 @@ public class ListingEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @SuppressWarnings("unused")
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
@@ -68,6 +70,7 @@ public class ListingEntity {
         updatedAt = now;
     }
 
+    @SuppressWarnings("unused")
     @PreUpdate
     void preUpdate() {
         updatedAt = Instant.now();

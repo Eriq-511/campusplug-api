@@ -15,9 +15,17 @@ This folder contains importable Postman assets for testing the CampusPlug API.
 
 - Run **Auth → Register** (or **Auth → Register (alternate location fallback)**) then **Auth → Login (sets {{token}})**.
 - After login, all secured requests will automatically use `Authorization: Bearer {{token}}`.
+- Login also sets `{{userId}}` / `{{publicUserId}}` for **Users → Get Public Profile**.
 - Run **Listings → Create Listing (sets {{listingId}})** to populate `{{listingId}}`.
 - Run **Conversations → Create/Get Conversation (sets {{conversationId}})** to populate `{{conversationId}}`.
 - Run **Messages → Send Message (sets {{messageId}})** to populate `{{messageId}}`.
+
+Additional coverage included in the collection:
+- **Auth → Verify OTP** (`/api/v1/auth/verify-otp`)
+- **Users → Update Last Location** and **Update FCM Token**
+- **Geo** (`/api/v1/geo/geocode`, `/api/v1/geo/reverse`)
+- **Zones** (`/api/v1/zones`, `/api/v1/location/check`)
+- **Browse** zone/feed endpoints (`/api/v1/listings/zone/{tag}`, `/count`, `/feed`)
 
 ## Notes
 

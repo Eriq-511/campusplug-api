@@ -47,8 +47,8 @@ public class PushNotificationService {
      */
     @Async
     public void notifyNearbyUsers(ListingEntity listing) {
-        // Use notifyNearbyUsersWithCoords when you have the lat/lng available.
-        if (!fcmEnabled()) return;
+        // Intentionally a no-op.
+        // Call notifyNearbyUsersWithCoords(...) when coordinates are available.
     }
 
     /**
