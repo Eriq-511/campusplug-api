@@ -177,8 +177,10 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
     int clearGeo(@Param("listingId") Long listingId);
 
     // G9 — auto-tag listing with the zone polygon it falls inside
+    // flushAutomatically=true: flush pending INSERT before the UPDATE
+    // clearAutomatically=true: evict the entity from cache so the subsequent JPA save picks up zone_tag
     @Transactional
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
             update listings
             set zone_tag = (
@@ -193,7 +195,8 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
                     @Param("lng") double lng);
 
     // G9 — count active listings in a zone (used by LocationCheckService)
-    @Query(value = "select count(*) from listings where zone_tag = :zoneTag and status = :status",
+    // Cast status::text so PostgreSQL doesn't complain about listing_status vs character varying
+    @Query(value = "select count(*) from listings where zone_tag = :zoneTag and status::text = :status",
            nativeQuery = true)
     long countByZoneTagAndStatus(@Param("zoneTag") String zoneTag, @Param("status") String status);
 

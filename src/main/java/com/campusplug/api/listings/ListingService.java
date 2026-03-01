@@ -120,7 +120,9 @@ public class ListingService {
         if (loc.lat() != null && loc.lng() != null) {
             listingRepository.updateGeo(saved.getId(), loc.lat(), loc.lng());
             // G9 — auto-tag listing with zone polygon it falls inside (fire-and-forget if no zone)
+            // clearAutomatically=true on the repo method evicts the entity; reload to pick up zone_tag
             listingRepository.autoTagZone(saved.getId(), loc.lat(), loc.lng());
+            saved = listingRepository.findById(saved.getId()).orElse(saved);
         } else {
             listingRepository.clearGeo(saved.getId());
         }
