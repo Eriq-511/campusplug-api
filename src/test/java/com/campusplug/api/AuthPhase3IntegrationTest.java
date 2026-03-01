@@ -57,6 +57,7 @@ class AuthPhase3IntegrationTest {
         registry.add("spring.data.redis.port", () -> String.valueOf(redis.getMappedPort(6379)));
 
         registry.add("management.health.redis.enabled", () -> "false");
+        registry.add("management.health.mail.enabled", () -> "false");
         registry.add("app.auth.allowed-email-domains", () -> "must.ac.ug,std.must.ac.ug");
         registry.add("app.auth.jwt.secret", () -> "test-secret-please-change");
         registry.add("app.auth.jwt.ttl-seconds", () -> "3600");
@@ -552,11 +553,12 @@ class AuthPhase3IntegrationTest {
 
         String resetBody = """
                 {
-                  "token": "%s",
+                  "email": "%s",
+                  "otp": "%s",
                   "password": "newpassword123",
                   "confirmPassword": "newpassword123"
                 }
-                """.formatted(token);
+                """.formatted(email, token);
 
         mockMvc.perform(post("/api/v1/auth/reset-password")
                         .contentType(MediaType.APPLICATION_JSON)

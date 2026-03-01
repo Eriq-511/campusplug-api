@@ -54,6 +54,11 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
         boolean allowed = true;
 
+        if (path.equals("/api/v1/auth/login") && method.equals("POST")) {
+            // 5 attempts per IP per 5-minute window — brute-force protection for login
+            allowed = rateLimiter.allow("campusplug:rl:login:ip:" + ip, 5, Duration.ofMinutes(5));
+        }
+
         if (path.equals("/api/v1/auth/forgot-password") && method.equals("POST")) {
             allowed =
                     rateLimiter.allow("campusplug:rl:forgot:ip:" + ip, 5, Duration.ofMinutes(2))

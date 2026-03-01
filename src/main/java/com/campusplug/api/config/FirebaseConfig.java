@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -20,12 +21,14 @@ public class FirebaseConfig {
     @Value("${app.firebase.service-account-json:}")
     private String serviceAccountJson;
 
+    /**
+     * Only registered when FIREBASE_SERVICE_ACCOUNT_JSON is non-blank.
+     * When absent (tests, local dev) no FirebaseApp bean exists and
+     * PushNotificationService uses Optional<FirebaseApp> to detect this.
+     */
     @Bean
+    @ConditionalOnExpression("!'${app.firebase.service-account-json:}'.isBlank()")
     public FirebaseApp firebaseApp() throws Exception {
-        if (serviceAccountJson == null || serviceAccountJson.isBlank()) {
-            log.warn("app.firebase.service-account-json not set — FCM push notifications disabled");
-            return null;
-        }
         if (!FirebaseApp.getApps().isEmpty()) {
             return FirebaseApp.getInstance();
         }

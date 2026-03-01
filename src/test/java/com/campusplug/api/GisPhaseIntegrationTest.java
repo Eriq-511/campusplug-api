@@ -23,6 +23,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -48,6 +49,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @SuppressWarnings({"unused", "resource"})
 class GisPhaseIntegrationTest {
+
+    // Sequential counter so each test call gets a unique registration number (avoids birthday-collision
+    // in small 3-digit GIS range when the shared Testcontainer DB accumulates rows across all 36 tests)
+    private static final AtomicInteger REG_SEQ = new AtomicInteger(100);
 
     // ─── Testcontainers ────────────────────────────────────────────────────────
 
@@ -772,7 +777,8 @@ class GisPhaseIntegrationTest {
     private String registerAndLoginWithLocation(String email, double lat, double lng) throws Exception {
         String ip = "10.1." + ThreadLocalRandom.current().nextInt(1, 254)
                 + "." + ThreadLocalRandom.current().nextInt(2, 254);
-        String regNo = "2025/GIS/" + ThreadLocalRandom.current().nextInt(100, 999);
+        // Use a sequential counter to guarantee registration number uniqueness within the shared container
+        String regNo = "2025/GIS/" + String.format("%03d", REG_SEQ.getAndIncrement() % 900);
 
         String registerBody = """
                 {

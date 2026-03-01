@@ -14,10 +14,12 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * G4 — Sends FCM push notifications to users near a new listing.
  * All methods are @Async so they never block the caller's response time.
+ * FirebaseApp is optional — if no service account is configured, this service is a no-op.
  */
 @Service
 public class PushNotificationService {
@@ -28,12 +30,15 @@ public class PushNotificationService {
     private static final double NOTIFY_RADIUS_METERS = 5000.0;
 
     private final UserRepository userRepository;
-    private final FirebaseApp firebaseApp;
+    private final FirebaseApp firebaseApp;  // null when FIREBASE_SERVICE_ACCOUNT_JSON is not set
 
     public PushNotificationService(UserRepository userRepository,
-                                   FirebaseApp firebaseApp) {
+                                   Optional<FirebaseApp> firebaseAppOpt) {
         this.userRepository = userRepository;
-        this.firebaseApp = firebaseApp;
+        this.firebaseApp = firebaseAppOpt.orElse(null);
+        if (this.firebaseApp == null) {
+            log.info("FCM push notifications disabled (no Firebase service account configured)");
+        }
     }
 
     /**

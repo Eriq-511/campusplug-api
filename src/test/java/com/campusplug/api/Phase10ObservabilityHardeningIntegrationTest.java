@@ -63,8 +63,9 @@ class Phase10ObservabilityHardeningIntegrationTest {
         registry.add("spring.data.redis.host", redis::getHost);
         registry.add("spring.data.redis.port", () -> String.valueOf(redis.getMappedPort(6379)));
 
-        // Keep health endpoint stable.
+        // Keep health endpoint stable — disable mail + redis health indicators (no SMTP server in tests).
         registry.add("management.health.redis.enabled", () -> "false");
+        registry.add("management.health.mail.enabled", () -> "false");
 
         registry.add("app.auth.allowed-email-domains", () -> "must.ac.ug,std.must.ac.ug");
         registry.add("app.auth.jwt.secret", () -> JWT_SECRET_MARKER);
