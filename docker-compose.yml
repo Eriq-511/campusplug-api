@@ -12,6 +12,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: campusplug
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      APP_OTP_ENABLED: "true"
+      APP_EMAIL_ENABLED: "true"
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      SPRING_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      SPRING_MAIL_SMTP_STARTTLS_REQUIRED: "true"
+      GMAIL_USER: ${GMAIL_USER:-}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
     ports:
       - "8080:8080"
     depends_on:
@@ -47,6 +57,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: campusplug-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
 
 volumes:
   campusplug_db:

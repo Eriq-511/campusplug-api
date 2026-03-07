@@ -1,14 +1,15 @@
 package com.campusplug.api.geo;
 
-import com.campusplug.api.common.ApiException;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.List;
-import java.util.Map;
+import com.campusplug.api.common.ApiException;
 
 @Service
 public class GeoService {
@@ -32,10 +33,25 @@ public class GeoService {
 
         String url = UriComponentsBuilder.fromUriString(GEOCODE_URL)
                 .queryParam("address", address)
+            .queryParam("components", "country:UG")
                 .queryParam("key", mapsApiKey)
                 .toUriString();
 
         Map<?, ?> response = restTemplate.getForObject(url, Map.class);
+        if (isZeroResults(response)) {
+            String fallbackAddress = withCountryFallback(address);
+            if (fallbackAddress != null) {
+                String fallbackUrl = UriComponentsBuilder.fromUriString(GEOCODE_URL)
+                        .queryParam("address", fallbackAddress)
+                    .queryParam("components", "country:UG")
+                        .queryParam("key", mapsApiKey)
+                        .toUriString();
+                Map<?, ?> fallbackResponse = restTemplate.getForObject(fallbackUrl, Map.class);
+                if (!isZeroResults(fallbackResponse)) {
+                    return parseGeocodeResponse(fallbackResponse, fallbackAddress);
+                }
+            }
+        }
         return parseGeocodeResponse(response, address);
     }
 
@@ -60,10 +76,13 @@ public class GeoService {
     }
 
     private GeoResponse parseGeocodeResponse(Map<?, ?> body, String query) {
-        String status = body == null ? null : (String) body.get("status");
+        if (body == null) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GEO_PROVIDER_ERROR",
+                    "Geocoding provider returned an empty response");
+        }
+        String status = (String) body.get("status");
         if (!"OK".equals(status)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "GEO_NOT_FOUND",
-                    "Geocoding failed for: " + query + " (status=" + status + ")");
+            throw geoProviderException("Geocoding failed for: " + query, body, status);
         }
 
         List<?> results = (List<?>) body.get("results");
@@ -82,10 +101,13 @@ public class GeoService {
     }
 
     private GeoResponse parseReverseResponse(Map<?, ?> body, double lat, double lng) {
-        String status = body == null ? null : (String) body.get("status");
+        if (body == null) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "GEO_PROVIDER_ERROR",
+                    "Geocoding provider returned an empty response");
+        }
+        String status = (String) body.get("status");
         if (!"OK".equals(status)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "GEO_NOT_FOUND",
-                    "Reverse geocoding failed (status=" + status + ")");
+            throw geoProviderException("Reverse geocoding failed", body, status);
         }
 
         List<?> results = (List<?>) body.get("results");
@@ -94,5 +116,46 @@ public class GeoService {
                 : "Unknown location";
 
         return new GeoResponse(lat, lng, address);
+    }
+
+    private ApiException geoProviderException(String prefix, Map<?, ?> body, String status) {
+        String errorMessage = body == null ? null : (String) body.get("error_message");
+
+        if ("ZERO_RESULTS".equals(status)) {
+            return new ApiException(HttpStatus.NOT_FOUND, "GEO_NOT_FOUND",
+                    prefix + " (status=ZERO_RESULTS)");
+        }
+
+        if ("REQUEST_DENIED".equals(status) || "OVER_DAILY_LIMIT".equals(status)
+                || "OVER_QUERY_LIMIT".equals(status)) {
+            String message = prefix + " (status=" + status + ")"
+                    + (errorMessage == null || errorMessage.isBlank() ? "" : ": " + errorMessage)
+                    + ". Check GOOGLE_MAPS_API_KEY restrictions, enabled APIs, and billing.";
+            return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "GEO_PROVIDER_ERROR", message);
+        }
+
+        String message = prefix + " (status=" + status + ")"
+                + (errorMessage == null || errorMessage.isBlank() ? "" : ": " + errorMessage);
+        return new ApiException(HttpStatus.BAD_REQUEST, "GEO_NOT_FOUND", message);
+    }
+
+    private static boolean isZeroResults(Map<?, ?> body) {
+        String status = body == null ? null : (String) body.get("status");
+        return "ZERO_RESULTS".equals(status);
+    }
+
+    private static String withCountryFallback(String address) {
+        if (address == null) {
+            return null;
+        }
+        String trimmed = address.trim();
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        String lower = trimmed.toLowerCase();
+        if (lower.contains("uganda")) {
+            return null;
+        }
+        return trimmed + ", Uganda";
     }
 }

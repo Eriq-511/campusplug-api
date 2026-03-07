@@ -220,6 +220,7 @@ public class ListingService {
 
             if (loc.lat() != null && loc.lng() != null) {
                 listingRepository.updateGeo(listing.getId(), loc.lat(), loc.lng());
+                listingRepository.autoTagZone(listing.getId(), loc.lat(), loc.lng());
             } else {
                 listingRepository.clearGeo(listing.getId());
             }

@@ -7,8 +7,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Stores a 6-digit numeric OTP in Redis keyed by (lowercase) email for
- * the password-reset flow.  TTL: 10 minutes.  Consuming the OTP deletes it
+ * Stores a 5-digit numeric OTP in Redis keyed by (lowercase) email for
+ * the password-reset flow. TTL: 10 minutes. Consuming the OTP deletes it
  * (one-time use).
  */
 @Service

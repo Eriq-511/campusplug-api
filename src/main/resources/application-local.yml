@@ -1,0 +1,10 @@
+spring:
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    username: ${SPRING_MAIL_USERNAME:${GMAIL_USER:}}
+    password: ${SPRING_MAIL_PASSWORD:${GMAIL_APP_PASSWORD:}}
+    properties:
+      mail.smtp.auth: ${SPRING_MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:false}
+      mail.smtp.starttls.required: ${SPRING_MAIL_SMTP_STARTTLS_REQUIRED:false}

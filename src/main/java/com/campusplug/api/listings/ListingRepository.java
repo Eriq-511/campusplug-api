@@ -178,6 +178,7 @@ public interface ListingRepository extends JpaRepository<ListingEntity, Long> {
     @Query(value = """
             update listings
             set geo = null,
+          zone_tag = null,
                 updated_at = now()
             where id = :listingId
             """, nativeQuery = true)

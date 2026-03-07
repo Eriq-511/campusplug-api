@@ -1,7 +1,6 @@
 package com.campusplug.api.geo;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,8 +25,8 @@ public class GeoController {
     /** G2 — Reverse geocode: ?lat=-0.6089&lng=30.6570 */
     @GetMapping("/reverse")
     public GeoResponse reverse(
-            @RequestParam @NotNull Double lat,
-            @RequestParam @NotNull Double lng) {
+            @RequestParam Double lat,
+            @RequestParam Double lng) {
         return geoService.reverseGeocode(lat, lng);
     }
 }

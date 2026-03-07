@@ -1,0 +1,15 @@
+# Render deployment profile
+# Activate with: SPRING_PROFILES_ACTIVE=render
+
+server:
+  # Render terminates TLS at the edge; respect forwarded headers for correct scheme/host.
+  forward-headers-strategy: framework
+
+spring:
+  cache:
+    type: ${SPRING_CACHE_TYPE:redis}
+
+management:
+  health:
+    redis:
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:true}

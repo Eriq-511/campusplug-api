@@ -15,7 +15,10 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import jakarta.validation.ConstraintViolationException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -104,6 +107,48 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST.getReasonPhrase(),
                 "MISSING_PARAMETER",
                 ex.getMessage(),
+                request.getRequestURI(),
+                null
+        ));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        String paramName = ex.getName() == null ? "parameter" : ex.getName();
+        String message = "Invalid value for parameter '" + paramName + "'";
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "INVALID_PARAMETER",
+                message,
+                request.getRequestURI(),
+                null
+        ));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "VALIDATION_ERROR",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null
+        ));
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiErrorResponse> handleHandlerMethodValidation(HandlerMethodValidationException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "VALIDATION_ERROR",
+                "Validation failed",
                 request.getRequestURI(),
                 null
         ));

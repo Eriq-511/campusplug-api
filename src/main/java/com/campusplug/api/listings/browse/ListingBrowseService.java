@@ -92,15 +92,16 @@ public class ListingBrowseService {
             double lng,
             int page,
             int size) {
+        String normalizedZoneTag = normalizeZoneTag(zoneTag);
         Pageable pageable = PageRequest.of(clampPage(page), clampSize(size));
         Page<ListingRepository.ListingCardProjection> result =
-                listingRepository.findByZoneTagActive(zoneTag, lat, lng, pageable);
+            listingRepository.findByZoneTagActive(normalizedZoneTag, lat, lng, pageable);
         return toPageResponse(result, pageable);
     }
 
     /** G9 — fast count for notification badge */
     public long countByZone(String zoneTag) {
-        return listingRepository.countByZoneTagAndStatus(zoneTag, "ACTIVE");
+        return listingRepository.countByZoneTagAndStatus(normalizeZoneTag(zoneTag), "ACTIVE");
     }
 
     /** G9 — global distance-sorted feed */
@@ -186,5 +187,13 @@ public class ListingBrowseService {
         }
         String t = s.trim();
         return t.isBlank() ? null : t;
+    }
+
+    private static String normalizeZoneTag(String zoneTag) {
+        String normalized = trimToNull(zoneTag);
+        if (normalized == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "zoneTag must not be blank");
+        }
+        return normalized.toLowerCase(Locale.ROOT);
     }
 }

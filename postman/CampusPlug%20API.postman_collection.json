@@ -6,7 +6,11 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" }
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "lat", "value": "-0.5950" },
+    { "key": "lng", "value": "30.5970" },
+    { "key": "zoneTag", "value": "kihumuro_main" },
+    { "key": "geoAddress", "value": "MUST%20Mbarara%2C%20Uganda" }
   ],
   "auth": {
     "type": "bearer",
@@ -47,7 +51,7 @@
       "name": "Auth",
       "item": [
         {
-          "name": "Register",
+          "name": "Register Start (OTP-first)",
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
@@ -56,13 +60,13 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"2026/BIT/123\",\n  \"email\": \"testuser123@must.ac.ug\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"registeredLocation\": {\n    \"label\": \"MUST Main Campus\",\n    \"lat\": -0.6089,\n    \"lng\": 30.6570\n  },\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"{{registrationNumber}}\",\n  \"email\": \"{{email}}\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"registeredLocation\": {\n    \"label\": \"MUST Main Campus\",\n    \"lat\": -0.6089,\n    \"lng\": 30.6570\n  }\n}"
             },
-            "url": "{{baseUrl}}/api/v1/auth/register"
+            "url": "{{baseUrl}}/api/v1/auth/register/start"
           }
         },
         {
-          "name": "Register (alternate location fallback)",
+          "name": "Register Start (alternate location fallback)",
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
@@ -71,9 +75,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"2026/BIT/124\",\n  \"email\": \"testuser124@must.ac.ug\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  },\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"{{registrationNumberAlt}}\",\n  \"email\": \"{{emailAlt}}\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  }\n}"
             },
-            "url": "{{baseUrl}}/api/v1/auth/register"
+            "url": "{{baseUrl}}/api/v1/auth/register/start"
           }
         },
         {
@@ -83,10 +87,21 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "pm.test('login returns 200', function () { pm.response.to.have.status(200); });",
                   "const json = pm.response.json();",
+                  "pm.test('login returns JWT token (no OTP step)', function () {",
+                  "  pm.expect(json).to.have.property('token');",
+                  "  pm.expect(json.token).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('login is not OTP pending', function () {",
+                  "  pm.expect(json.status).to.not.eql('OTP_SENT');",
+                  "});",
                   "if (json && json.token) { pm.environment.set('token', json.token); }",
                   "if (json && json.user && json.user.email) { pm.environment.set('email', json.user.email); }",
-                  "if (json && json.user && json.user.id) { pm.environment.set('userId', json.user.id); pm.environment.set('publicUserId', json.user.id); }"
+                  "if (json && json.user && json.user.id) { pm.environment.set('publicUserId', json.user.id); }",
+                  "if (json && json.status === 'OTP_SENT') {",
+                  "  throw new Error('Server is still running old login OTP flow. Restart/rebuild backend so /api/v1/auth/login returns token directly.');",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -100,13 +115,13 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"testuser123@must.ac.ug\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/auth/login"
           }
         },
         {
-          "name": "Verify OTP",
+          "name": "Register Verify OTP",
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
@@ -115,9 +130,38 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"testuser123@must.ac.ug\",\n  \"otp\": \"{{otpCode}}\"\n}"
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otpCode}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/v1/auth/verify-otp"
+            "url": "{{baseUrl}}/api/v1/auth/register/verify-otp"
+          }
+        },
+        {
+          "name": "Register Set Password (sets {{token}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.token) { pm.environment.set('token', json.token); }",
+                  "if (json && json.user && json.user.email) { pm.environment.set('email', json.user.email); }",
+                  "if (json && json.user && json.user.id) { pm.environment.set('publicUserId', json.user.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register/set-password"
           }
         },
         {
@@ -129,6 +173,18 @@
         },
         {
           "name": "Forgot Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.devOtp) { pm.environment.set('otpCode', json.devOtp); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
@@ -137,7 +193,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"testuser123@must.ac.ug\"\n}"
+              "raw": "{\n  \"email\": \"{{email}}\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/auth/forgot-password"
           }
@@ -152,7 +208,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"PASTE_TOKEN_FROM_FORGOT_PASSWORD_IN_LOCAL_PROFILE\",\n  \"password\": \"newpassword123\",\n  \"confirmPassword\": \"newpassword123\"\n}"
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otpCode}}\",\n  \"password\": \"{{newPassword}}\",\n  \"confirmPassword\": \"{{newPassword}}\"\n}"
             },
             "url": "{{baseUrl}}/api/v1/auth/reset-password"
           }
@@ -258,7 +314,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
                   "const j = pm.response.json();",
                   "if (j && j.id) { pm.environment.set('listingId', j.id); }",
                   "pm.test('status is ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
@@ -463,7 +519,9 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('purge message present', () => pm.expect(j.message).to.eql('Purged'));"
                 ],
                 "type": "text/javascript"
               }
@@ -487,7 +545,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
                   "const j = pm.response.json();",
                   "if (j && j.id) { pm.environment.set('lcListingId', j.id); }",
                   "pm.test('status ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
@@ -636,7 +694,9 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('purge message present', () => pm.expect(j.message).to.eql('Purged'));"
                 ],
                 "type": "text/javascript"
               }
@@ -696,7 +756,7 @@
           "name": "Forward Geocode",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/api/v1/geo/geocode?address=MUST%20Mbarara"
+            "url": "{{baseUrl}}/api/v1/geo/geocode?address={{geoAddress}}"
           }
         },
         {
@@ -851,51 +911,37 @@
       ]
     },
     {
-      "name": "Conversation Flow (2-user demo)",
-      "description": "Step-by-step: Poster creates listing, Inquirer starts conversation, both exchange messages. Run in order.",
+      "name": "Conversation Flow (2-user OTP demo)",
+      "description": "Step-by-step with OTP-first registration for both users. Run in order and set sellerOtpCode/buyerOtpCode from email before verify steps.",
       "item": [
         {
-          "name": "Step 1 — Register Poster",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": ["const j = pm.response.json(); if (j && j.token) { pm.environment.set('sellerToken', j.token); pm.environment.set('token', j.token); } "],
-              "type": "text/javascript"
-            }
-          }],
+          "name": "Step 1 — Register Start Poster",
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Alice Seller\",\n  \"registrationNumber\": \"2025/BIT/001\",\n  \"email\": \"alice.seller@std.must.ac.ug\",\n  \"phoneNumber\": \"+256700000001\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 },\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+              "raw": "{\n  \"fullName\": \"Alice Seller\",\n  \"registrationNumber\": \"{{sellerRegistrationNumber}}\",\n  \"email\": \"{{sellerEmail}}\",\n  \"phoneNumber\": \"+256700000001\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 }\n}"
             },
-            "url": "{{baseUrl}}/api/v1/auth/register"
+            "url": "{{baseUrl}}/api/v1/auth/register/start"
           }
         },
         {
-          "name": "Step 2 — Register Inquirer",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": ["const j = pm.response.json(); if (j && j.token) { pm.environment.set('buyerToken', j.token); } "],
-              "type": "text/javascript"
-            }
-          }],
+          "name": "Step 2 — Verify OTP Poster",
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Bob Buyer\",\n  \"registrationNumber\": \"2025/BIT/002\",\n  \"email\": \"bob.buyer@std.must.ac.ug\",\n  \"phoneNumber\": \"+256700000002\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 },\n  \"password\": \"password123\",\n  \"confirmPassword\": \"password123\"\n}"
+              "raw": "{\n  \"email\": \"{{sellerEmail}}\",\n  \"otp\": \"{{sellerOtpCode}}\"\n}"
             },
-            "url": "{{baseUrl}}/api/v1/auth/register"
+            "url": "{{baseUrl}}/api/v1/auth/register/verify-otp"
           }
         },
         {
-          "name": "Step 3 — Login as Poster (sets sellerToken + token)",
+          "name": "Step 3 — Set Password Poster (sets sellerToken)",
           "event": [{
             "listen": "test",
             "script": {
@@ -907,31 +953,35 @@
             "auth": { "type": "noauth" },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"alice.seller@std.must.ac.ug\",\n  \"password\": \"password123\"\n}" },
-            "url": "{{baseUrl}}/api/v1/auth/login"
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{sellerEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/register/set-password"
           }
         },
         {
-          "name": "Step 4 — Create Listing as Poster (sets listingId)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": ["const j = pm.response.json(); if (j && j.id) { pm.environment.set('listingId', j.id); }"],
-              "type": "text/javascript"
-            }
-          }],
+          "name": "Step 4 — Register Start Inquirer",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{\n  \"title\": \"MacBook Pro 2021\",\n  \"priceUgx\": 4500000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Great condition, barely used\"\n}" },
-            "url": "{{baseUrl}}/api/v1/listings"
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Bob Buyer\",\n  \"registrationNumber\": \"{{buyerRegistrationNumber}}\",\n  \"email\": \"{{buyerEmail}}\",\n  \"phoneNumber\": \"+256700000002\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 }\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register/start"
           }
         },
         {
-          "name": "Step 5 — Login as Inquirer (sets buyerToken + token)",
+          "name": "Step 5 — Verify OTP Inquirer",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{buyerEmail}}\",\n  \"otp\": \"{{buyerOtpCode}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/register/verify-otp"
+          }
+        },
+        {
+          "name": "Step 6 — Set Password Inquirer (sets buyerToken)",
           "event": [{
             "listen": "test",
             "script": {
@@ -943,12 +993,32 @@
             "auth": { "type": "noauth" },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"bob.buyer@std.must.ac.ug\",\n  \"password\": \"password123\"\n}" },
-            "url": "{{baseUrl}}/api/v1/auth/login"
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{buyerEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}" },
+            "url": "{{baseUrl}}/api/v1/auth/register/set-password"
           }
         },
         {
-          "name": "Step 6 — Inquirer starts Conversation (sets conversationId)",
+          "name": "Step 7 — Create Listing as Poster (sets listingId)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["const j = pm.response.json(); if (j && j.id) { pm.environment.set('listingId', j.id); }"],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"MacBook Pro 2021\",\n  \"priceUgx\": 4500000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Great condition, barely used\"\n}" },
+            "url": "{{baseUrl}}/api/v1/listings"
+          }
+        },
+        {
+          "name": "Step 8 — Inquirer starts Conversation (sets conversationId)",
           "event": [{
             "listen": "test",
             "script": {
@@ -957,6 +1027,7 @@
             }
           }],
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
@@ -967,7 +1038,7 @@
           }
         },
         {
-          "name": "Step 7 — Inquirer sends Message (sets messageId)",
+          "name": "Step 9 — Inquirer sends Message (sets messageId)",
           "event": [{
             "listen": "test",
             "script": {
@@ -976,6 +1047,7 @@
             }
           }],
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
@@ -986,8 +1058,9 @@
           }
         },
         {
-          "name": "Step 8 — Poster replies",
+          "name": "Step 10 — Poster replies",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
@@ -998,8 +1071,9 @@
           }
         },
         {
-          "name": "Step 9 — Poster reads messages",
+          "name": "Step 11 — Poster reads messages",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
             "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages?limit=50"

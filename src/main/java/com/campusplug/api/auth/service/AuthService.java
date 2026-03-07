@@ -19,6 +19,8 @@ import com.campusplug.api.auth.dto.ForgotPasswordResponse;
 import com.campusplug.api.auth.dto.LoginRequest;
 import com.campusplug.api.auth.dto.OtpVerifyRequest;
 import com.campusplug.api.auth.dto.RegisterRequest;
+import com.campusplug.api.auth.dto.RegisterSetPasswordRequest;
+import com.campusplug.api.auth.dto.RegisterStartRequest;
 import com.campusplug.api.auth.dto.ResetPasswordRequest;
 import com.campusplug.api.auth.util.RegistrationNumberNormalizer;
 import com.campusplug.api.common.ApiException;
@@ -43,6 +45,7 @@ public class AuthService {
     private final EmailService emailService;
     private final AuthProperties authProperties;
     private final OtpStore otpStore;
+    private final PendingRegistrationStore pendingRegistrationStore;
 
     public AuthService(
             UserRepository userRepository,
@@ -54,7 +57,8 @@ public class AuthService {
             Environment environment,
             EmailService emailService,
             AuthProperties authProperties,
-            OtpStore otpStore) {
+            OtpStore otpStore,
+            PendingRegistrationStore pendingRegistrationStore) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -65,6 +69,120 @@ public class AuthService {
         this.emailService = emailService;
         this.authProperties = authProperties;
         this.otpStore = otpStore;
+        this.pendingRegistrationStore = pendingRegistrationStore;
+    }
+
+    @Transactional
+    public Map<String, String> registerStart(RegisterStartRequest req) {
+        if (!authProperties.isOtpEnabled()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "OTP_NOT_ENABLED", "Use /api/v1/auth/register when OTP is disabled.");
+        }
+        if (!emailService.isEnabled()) {
+            throw new ApiException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "EMAIL_DISABLED",
+                    "OTP is enabled but email delivery is disabled. Set APP_EMAIL_ENABLED=true and configure SMTP/Gmail settings."
+            );
+        }
+
+        PendingRegistrationStore.PendingRegistration pending = buildPendingRegistration(
+                req.getFullName(),
+                req.getRegistrationNumber(),
+                req.getEmail(),
+                req.getPhoneNumber(),
+                req.getCampus(),
+                req.getRegisteredLocation(),
+                req.getAlternateLocation()
+        );
+
+        pendingRegistrationStore.save(pending);
+        String otp = otpStore.createOtp(pending.getEmail());
+        emailService.sendOtpEmail(pending.getEmail(), otp);
+
+        return Map.of(
+                "status", "OTP_SENT",
+                "message", "A 5-digit verification code was sent to " + maskEmail(pending.getEmail())
+        );
+    }
+
+    public Map<String, String> verifyRegisterOtp(OtpVerifyRequest req) {
+        if (!authProperties.isOtpEnabled()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "OTP_NOT_ENABLED", "Use /api/v1/auth/register when OTP is disabled.");
+        }
+
+        String email = normalizeEmail(req.getEmail());
+        emailDomainValidator.validateAllowedDomain(email);
+
+        boolean pendingExists = pendingRegistrationStore.find(email).isPresent();
+        if (!pendingExists) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REGISTRATION_NOT_STARTED",
+                    "Start registration first via /api/v1/auth/register/start.");
+        }
+
+        boolean valid = otpStore.consumeOtp(email, req.getOtp());
+        if (!valid) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_OTP",
+                    "The code is incorrect or has expired. Request a new one by starting registration again.");
+        }
+
+        pendingRegistrationStore.markOtpVerified(email);
+        return Map.of(
+                "status", "OTP_VERIFIED",
+                "message", "Code verified. You can now set your password to complete registration."
+        );
+    }
+
+    @Transactional
+    public AuthResponse registerSetPassword(RegisterSetPasswordRequest req) {
+        if (!authProperties.isOtpEnabled()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "OTP_NOT_ENABLED", "Use /api/v1/auth/register when OTP is disabled.");
+        }
+        if (!req.getPassword().equals(req.getConfirmPassword())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_MISMATCH", "confirmPassword must match password");
+        }
+
+        String email = normalizeEmail(req.getEmail());
+        emailDomainValidator.validateAllowedDomain(email);
+
+        if (!pendingRegistrationStore.isOtpVerified(email)) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "OTP_NOT_VERIFIED",
+                    "Verify OTP first via /api/v1/auth/register/verify-otp.");
+        }
+
+        PendingRegistrationStore.PendingRegistration pending = pendingRegistrationStore.find(email)
+                .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "REGISTRATION_EXPIRED",
+                        "Registration details expired. Start again via /api/v1/auth/register/start."));
+
+        if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
+            throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_EMAIL", "Email already registered");
+        }
+        if (userRepository.existsByRegistrationNumber(pending.getRegistrationNumber())) {
+            throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_REGISTRATION_NUMBER", "Registration number already registered");
+        }
+
+        UserEntity user = new UserEntity();
+        user.setFullName(pending.getFullName());
+        user.setEmail(pending.getEmail());
+        user.setRegistrationNumber(pending.getRegistrationNumber());
+        user.setPhoneNumber(pending.getPhoneNumber());
+        user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+        user.setCampus(pending.getCampus());
+        user.setRegisteredLocationText(pending.getRegisteredLocationLabel());
+        user.setAlternateLocationText(pending.getAlternateLocationLabel());
+
+        UserEntity saved = userRepository.save(user);
+
+        if (pending.getRegisteredLocationLat() != null && pending.getRegisteredLocationLng() != null) {
+            userRepository.updateRegisteredGeo(saved.getId(), pending.getRegisteredLocationLat(), pending.getRegisteredLocationLng());
+            userRepository.clearAlternateGeo(saved.getId());
+        } else if (pending.getAlternateLocationLat() != null && pending.getAlternateLocationLng() != null) {
+            userRepository.updateAlternateGeo(saved.getId(), pending.getAlternateLocationLat(), pending.getAlternateLocationLng());
+            userRepository.clearRegisteredGeo(saved.getId());
+        }
+
+        pendingRegistrationStore.clear(email);
+
+        return new AuthResponse(jwtService.createToken(saved), toSummary(saved));
     }
 
     @Transactional
@@ -115,23 +233,85 @@ public class AuthService {
             return new AuthResponse(token, toSummary(saved));
         }
 
-        // OTP enabled — send email verification code; JWT only issued after /verify-otp
+        if (!emailService.isEnabled()) {
+            throw new ApiException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "EMAIL_DISABLED",
+                    "OTP is enabled but email delivery is disabled. Set APP_EMAIL_ENABLED=true and configure SMTP/Gmail settings."
+            );
+        }
+
+        // OTP enabled — send email verification code; JWT only issued after /register/verify-otp + /register/set-password
         String otp = otpStore.createOtp(email);
         emailService.sendOtpEmail(email, otp);
 
         String masked = maskEmail(email);
         return Map.of(
                 "status", "OTP_SENT",
-                "message", "A 6-digit verification code was sent to " + masked
+                "message", "A 5-digit verification code was sent to " + masked
         );
     }
 
+    private PendingRegistrationStore.PendingRegistration buildPendingRegistration(
+            String fullName,
+            String registrationNumber,
+            String emailInput,
+            String phoneNumber,
+            String campus,
+            RegisteredLocationDto registeredLocation,
+            RegisteredLocationDto alternateLocation
+    ) {
+        String email = normalizeEmail(emailInput);
+        emailDomainValidator.validateAllowedDomain(email);
+
+        String regNo;
+        try {
+            regNo = RegistrationNumberNormalizer.normalize(registrationNumber);
+        } catch (IllegalArgumentException ex) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REGISTRATION_NUMBER", ex.getMessage());
+        }
+
+        String phone = normalizePhone(phoneNumber);
+        if (phone != null && !E164.matcher(phone).matches()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_PHONE_NUMBER", "phoneNumber must be E.164 (e.g. +256700000000)");
+        }
+
+        if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
+            throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_EMAIL", "Email already registered");
+        }
+        if (userRepository.existsByRegistrationNumber(regNo)) {
+            throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_REGISTRATION_NUMBER", "Registration number already registered");
+        }
+
+        UserEntity draft = new UserEntity();
+        draft.setCampus(normalizeCampus(campus));
+        applySavedLocationOnRegister(draft, registeredLocation, alternateLocation);
+
+        PendingRegistrationStore.PendingRegistration pending = new PendingRegistrationStore.PendingRegistration();
+        pending.setFullName(fullName.trim());
+        pending.setRegistrationNumber(regNo);
+        pending.setEmail(email);
+        pending.setPhoneNumber(phone);
+        pending.setCampus(draft.getCampus());
+        pending.setRegisteredLocationLabel(draft.getRegisteredLocationText());
+        pending.setAlternateLocationLabel(draft.getAlternateLocationText());
+
+        if (hasAnyLocationPayload(registeredLocation)) {
+            pending.setRegisteredLocationLat(registeredLocation.getLat());
+            pending.setRegisteredLocationLng(registeredLocation.getLng());
+        }
+        if (hasAnyLocationPayload(alternateLocation)) {
+            pending.setAlternateLocationLat(alternateLocation.getLat());
+            pending.setAlternateLocationLng(alternateLocation.getLng());
+        }
+
+        return pending;
+    }
+
     /**
-     * When OTP is disabled (default): returns AuthResponse with JWT immediately.
-     * When OTP is enabled: validates credentials, sends a 6-digit code by email,
-     * and returns a pending response. The JWT is only issued after /verify-otp.
+     * Login returns JWT immediately after credential validation.
      */
-    public Object login(LoginRequest req) {
+    public AuthResponse login(LoginRequest req) {
         String email = normalizeEmail(req.getEmail());
         emailDomainValidator.validateAllowedDomain(email);
 
@@ -141,38 +321,6 @@ public class AuthService {
         if (!passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid email or password");
         }
-
-        if (!authProperties.isOtpEnabled()) {
-            // OTP disabled — return JWT directly (preserves existing test behaviour)
-            return new AuthResponse(jwtService.createToken(user), toSummary(user));
-        }
-
-        // OTP enabled — generate code, send email, return pending status
-        String otp = otpStore.createOtp(email);
-        emailService.sendOtpEmail(email, otp);
-
-        String masked = maskEmail(email);
-        return Map.of(
-                "status", "OTP_SENT",
-                "message", "A 6-digit verification code was sent to " + masked
-        );
-    }
-
-    /**
-     * Second step of OTP login: validates the 6-digit code and returns the JWT.
-     */
-    public AuthResponse verifyOtp(OtpVerifyRequest req) {
-        String email = normalizeEmail(req.getEmail());
-        emailDomainValidator.validateAllowedDomain(email);
-
-        boolean valid = otpStore.consumeOtp(email, req.getOtp());
-        if (!valid) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_OTP",
-                    "The code is incorrect or has expired. Request a new one by logging in again.");
-        }
-
-        UserEntity user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "User not found"));
 
         return new AuthResponse(jwtService.createToken(user), toSummary(user));
     }
@@ -208,7 +356,7 @@ public class AuthService {
 
         String devOtp = null;
         if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
-            // Generate a 6-digit numeric OTP (matches the UI code-entry screen)
+            // Generate a 5-digit numeric OTP (matches the UI code-entry screen)
             String otp = passwordResetOtpStore.createOtp(email);
             // Send email asynchronously — never blocks the HTTP response
             emailService.sendPasswordResetOtpEmail(email, otp);
@@ -230,7 +378,7 @@ public class AuthService {
 
         String email = normalizeEmail(req.getEmail());
 
-        // Validate the 6-digit OTP the user entered on the Forgot-Password screen
+        // Validate the 5-digit OTP the user entered on the Forgot-Password screen
         boolean valid = passwordResetOtpStore.consumeOtp(email, req.getOtp());
         if (!valid) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_RESET_CODE",

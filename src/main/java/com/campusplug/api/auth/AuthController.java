@@ -16,6 +16,8 @@ import com.campusplug.api.auth.dto.ForgotPasswordResponse;
 import com.campusplug.api.auth.dto.LoginRequest;
 import com.campusplug.api.auth.dto.OtpVerifyRequest;
 import com.campusplug.api.auth.dto.RegisterRequest;
+import com.campusplug.api.auth.dto.RegisterSetPasswordRequest;
+import com.campusplug.api.auth.dto.RegisterStartRequest;
 import com.campusplug.api.auth.dto.ResetPasswordRequest;
 import com.campusplug.api.auth.service.AuthService;
 
@@ -36,14 +38,24 @@ public class AuthController {
         return ResponseEntity.ok(authService.register(request));
     }
 
+    @PostMapping("/register/start")
+    public ResponseEntity<?> registerStart(@Valid @RequestBody RegisterStartRequest request) {
+        return ResponseEntity.ok(authService.registerStart(request));
+    }
+
+    @PostMapping("/register/verify-otp")
+    public ResponseEntity<?> verifyRegisterOtp(@Valid @RequestBody OtpVerifyRequest request) {
+        return ResponseEntity.ok(authService.verifyRegisterOtp(request));
+    }
+
+    @PostMapping("/register/set-password")
+    public AuthResponse registerSetPassword(@Valid @RequestBody RegisterSetPasswordRequest request) {
+        return authService.registerSetPassword(request);
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
-    }
-
-    @PostMapping("/verify-otp")
-    public AuthResponse verifyOtp(@Valid @RequestBody OtpVerifyRequest request) {
-        return authService.verifyOtp(request);
     }
 
     @PostMapping("/logout")

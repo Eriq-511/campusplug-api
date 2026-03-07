@@ -3,13 +3,10 @@ package com.campusplug.api.auth.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailService {
@@ -24,150 +21,94 @@ public class EmailService {
     @Value("${app.email.enabled:false}")
     private boolean enabled;
 
+    @Value("${spring.mail.host:}")
+    private String mailHost;
+
+    @Value("${spring.mail.port:0}")
+    private int mailPort;
+
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
+      log.info("[EmailService] initialized");
+    }
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    private void sendPlainTextEmail(String toEmail, String subject, String body, String successLogPrefix) {
+      try {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
+        message.setTo(toEmail);
+        message.setSubject(subject);
+        message.setText(body);
+        mailSender.send(message);
+        log.info("[EmailService] {} {}", successLogPrefix, toEmail);
+      } catch (RuntimeException e) {
+        log.error("[EmailService] Failed to send email to {} via SMTP {}:{} user='{}': {}",
+            toEmail, safe(mailHost), mailPort, safe(mailUsername), e.getMessage(), e);
+      }
     }
 
     /**
-     * Sends a 6-digit OTP to the user's email for login verification.
+     * Sends a 5-digit OTP to the user's email for login verification.
      * Runs asynchronously so it never blocks the HTTP response.
      */
     @Async
     public void sendOtpEmail(String toEmail, String otp) {
         if (!enabled) {
-            log.info("[EmailService] Email disabled — OTP for {}: {}", toEmail, otp);
+        log.warn("[EmailService] Email disabled (app.email.enabled=false) — OTP for {}: {}", toEmail, otp);
+        log.warn(
+            "[EmailService] To enable delivery, set APP_EMAIL_ENABLED=true and configure SMTP. SMTP currently: {}:{} user='{}'",
+            safe(mailHost), mailPort, safe(mailUsername)
+        );
             return;
         }
 
         String body = """
-                <html>
-                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-                  <h2 style="color: #2C3E50;">CampusPlug — Login Verification</h2>
-                  <p>Use the code below to complete your login. It expires in <strong>5 minutes</strong>.</p>
-                  <div style="text-align: center; margin: 32px 0;">
-                    <span style="font-size: 42px; font-weight: bold; letter-spacing: 12px;
-                                 color: #27AE60; background: #F0FFF4; padding: 16px 24px;
-                                 border-radius: 8px; display: inline-block;">%s</span>
-                  </div>
-                  <p style="color: #7F8C8D; font-size: 13px;">
-                    If you did not attempt to log in, someone may have your password.
-                    Change it immediately.
-                  </p>
-                  <hr style="border: none; border-top: 1px solid #ECF0F1; margin-top: 32px;">
-                  <p style="color: #BDC3C7; font-size: 11px;">CampusPlug · Mbarara University of Science and Technology</p>
-                </body>
-                </html>
+          Tukwataganee login verification code
+
+                Your 5-digit code is: %s
+                It expires in 5 minutes.
+
+                If you did not attempt to log in, ignore this message.
                 """.formatted(otp);
 
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(from);
-            helper.setTo(toEmail);
-            helper.setSubject("CampusPlug — Your login code: " + otp);
-            helper.setText(body, true);
-            mailSender.send(message);
-            log.info("[EmailService] OTP email sent to {}", toEmail);
-        } catch (MessagingException e) {
-            log.error("[EmailService] Failed to send OTP email to {}: {}", toEmail, e.getMessage());
-        }
+        sendPlainTextEmail(toEmail, "Tukwataganee login code: " + otp, body, "OTP email sent to");
     }
 
     /**
-     * Sends a 6-digit password-reset OTP to the user's email.
+     * Sends a 5-digit password-reset OTP to the user's email.
      * Runs asynchronously so it never blocks the HTTP response.
      */
     @Async
     public void sendPasswordResetOtpEmail(String toEmail, String otp) {
         if (!enabled) {
-            log.info("[EmailService] Email disabled — password reset OTP for {}: {}", toEmail, otp);
+        log.warn("[EmailService] Email disabled (app.email.enabled=false) — password reset OTP for {}: {}", toEmail, otp);
+        log.warn(
+            "[EmailService] To enable delivery, set APP_EMAIL_ENABLED=true and configure SMTP. SMTP currently: {}:{} user='{}'",
+            safe(mailHost), mailPort, safe(mailUsername)
+        );
             return;
         }
 
         String body = """
-                <html>
-                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-                  <h2 style="color: #2C3E50;">CampusPlug — Password Reset Code</h2>
-                  <p>Use the code below to reset your password. It expires in <strong>10 minutes</strong>.</p>
-                  <div style="text-align: center; margin: 32px 0;">
-                    <span style="font-size: 42px; font-weight: bold; letter-spacing: 12px;
-                                 color: #E74C3C; background: #FFF5F5; padding: 16px 24px;
-                                 border-radius: 8px; display: inline-block;">%s</span>
-                  </div>
-                  <p style="color: #7F8C8D; font-size: 13px;">
-                    If you did not request a password reset, you can safely ignore this email.
-                  </p>
-                  <hr style="border: none; border-top: 1px solid #ECF0F1; margin-top: 32px;">
-                  <p style="color: #BDC3C7; font-size: 11px;">CampusPlug · Mbarara University of Science and Technology</p>
-                </body>
-                </html>
+                Tukwatagane password reset code
+
+                Your 5-digit reset code is: %s
+                It expires in 10 minutes.
+
+                If you did not request a password reset, ignore this message.
                 """.formatted(otp);
 
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(from);
-            helper.setTo(toEmail);
-            helper.setSubject("CampusPlug — Your password reset code: " + otp);
-            helper.setText(body, true);
-            mailSender.send(message);
-            log.info("[EmailService] Password reset OTP email sent to {}", toEmail);
-        } catch (MessagingException e) {
-            log.error("[EmailService] Failed to send password reset OTP email to {}: {}", toEmail, e.getMessage());
-        }
+        sendPlainTextEmail(toEmail, "Tukwatagane password reset code: " + otp, body, "Password reset OTP email sent to");
     }
 
-    /**
-     * Sends a password reset email containing both a direct link and the raw token.
-     * Runs asynchronously so it never blocks the HTTP response.
-     */
-    @Async
-    public void sendPasswordResetEmail(String toEmail, String resetToken, String frontendBaseUrl) {
-        if (!enabled) {
-            log.info("[EmailService] Email disabled — reset token for {}: {}", toEmail, resetToken);
-            return;
-        }
-
-        String resetLink = frontendBaseUrl + "/reset-password?token=" + resetToken;
-
-        String body = """
-                <html>
-                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-                  <h2 style="color: #2C3E50;">CampusPlug — Password Reset</h2>
-                  <p>You requested a password reset. Click the button below to choose a new password:</p>
-                  <p style="text-align: center; margin: 32px 0;">
-                    <a href="%s"
-                       style="background-color: #27AE60; color: white; padding: 14px 28px;
-                              text-decoration: none; border-radius: 6px; font-size: 16px;">
-                      Reset My Password
-                    </a>
-                  </p>
-                  <p style="color: #7F8C8D; font-size: 13px;">
-                    Or copy this link into your browser:<br>
-                    <a href="%s" style="color: #2980B9;">%s</a>
-                  </p>
-                  <p style="color: #7F8C8D; font-size: 13px;">
-                    This link expires in <strong>30 minutes</strong>.<br>
-                    If you did not request a reset, you can safely ignore this email.
-                  </p>
-                  <hr style="border: none; border-top: 1px solid #ECF0F1; margin-top: 32px;">
-                  <p style="color: #BDC3C7; font-size: 11px;">CampusPlug · Mbarara University of Science and Technology</p>
-                </body>
-                </html>
-                """.formatted(resetLink, resetLink, resetLink);
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(from);
-            helper.setTo(toEmail);
-            helper.setSubject("CampusPlug — Reset your password");
-            helper.setText(body, true); // true = HTML
-            mailSender.send(message);
-            log.info("[EmailService] Password reset email sent to {}", toEmail);
-        } catch (MessagingException e) {
-            // Log but do not rethrow — user still gets the generic "email sent" response
-            log.error("[EmailService] Failed to send password reset email to {}: {}", toEmail, e.getMessage());
-        }
-    }
+      private static String safe(String v) {
+        return v == null ? "" : v;
+      }
 }
