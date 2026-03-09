@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -40,32 +39,32 @@ public class EmailService {
     }
 
     private void sendPlainTextEmail(String toEmail, String subject, String body, String successLogPrefix) {
-      try {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(toEmail);
         message.setSubject(subject);
         message.setText(body);
-        mailSender.send(message);
-        log.info("[EmailService] {} {}", successLogPrefix, toEmail);
-      } catch (RuntimeException e) {
-        log.error("[EmailService] Failed to send email to {} via SMTP {}:{} user='{}': {}",
-            toEmail, safe(mailHost), mailPort, safe(mailUsername), e.getMessage(), e);
-      }
+        try {
+            mailSender.send(message);
+            log.info("[EmailService] {} {}", successLogPrefix, toEmail);
+        } catch (RuntimeException e) {
+            log.error("[EmailService][SMTP FAILURE] Could not send to {} via {}:{} user='{}': {}",
+                toEmail, safe(mailHost), mailPort, safe(mailUsername), e.getMessage(), e);
+            throw e; // propagate so the caller knows delivery failed
+        }
     }
 
     /**
      * Sends a 5-digit OTP to the user's email for login verification.
-     * Runs asynchronously so it never blocks the HTTP response.
+     * Synchronous: the caller gets an immediate error if SMTP fails.
      */
-    @Async
     public void sendOtpEmail(String toEmail, String otp) {
         if (!enabled) {
-        log.warn("[EmailService] Email disabled (app.email.enabled=false) — OTP for {}: {}", toEmail, otp);
-        log.warn(
-            "[EmailService] To enable delivery, set APP_EMAIL_ENABLED=true and configure SMTP. SMTP currently: {}:{} user='{}'",
-            safe(mailHost), mailPort, safe(mailUsername)
-        );
+            log.warn("[EmailService] Email disabled (app.email.enabled=false) — OTP for {}: {}", toEmail, otp);
+            log.warn(
+                "[EmailService] To enable delivery, set APP_EMAIL_ENABLED=true and configure SMTP. SMTP currently: {}:{} user='{}'",
+                safe(mailHost), mailPort, safe(mailUsername)
+            );
             return;
         }
 
@@ -83,16 +82,15 @@ public class EmailService {
 
     /**
      * Sends a 5-digit password-reset OTP to the user's email.
-     * Runs asynchronously so it never blocks the HTTP response.
+     * Synchronous: the caller gets an immediate error if SMTP fails.
      */
-    @Async
     public void sendPasswordResetOtpEmail(String toEmail, String otp) {
         if (!enabled) {
-        log.warn("[EmailService] Email disabled (app.email.enabled=false) — password reset OTP for {}: {}", toEmail, otp);
-        log.warn(
-            "[EmailService] To enable delivery, set APP_EMAIL_ENABLED=true and configure SMTP. SMTP currently: {}:{} user='{}'",
-            safe(mailHost), mailPort, safe(mailUsername)
-        );
+            log.warn("[EmailService] Email disabled (app.email.enabled=false) — password reset OTP for {}: {}", toEmail, otp);
+            log.warn(
+                "[EmailService] To enable delivery, set APP_EMAIL_ENABLED=true and configure SMTP. SMTP currently: {}:{} user='{}'",
+                safe(mailHost), mailPort, safe(mailUsername)
+            );
             return;
         }
 

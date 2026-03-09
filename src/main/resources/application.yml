@@ -48,6 +48,12 @@ spring:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
       mail.smtp.starttls.required: true
+      # Trust Gmail's certificate on cloud/Docker environments
+      mail.smtp.ssl.trust: smtp.gmail.com
+      # Fail fast instead of hanging the async thread
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
     test-connection: false
 
 app:

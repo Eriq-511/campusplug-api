@@ -47,6 +47,11 @@ public class OtpStore {
         return Boolean.TRUE.equals(redisTemplate.hasKey(key(email)));
     }
 
+    /** Removes a stored OTP without consuming it (e.g. on email delivery failure). */
+    public void deleteOtp(String email) {
+        redisTemplate.delete(key(email));
+    }
+
     private static String key(String email) {
         return "campusplug:auth:otp:" + email.toLowerCase();
     }
