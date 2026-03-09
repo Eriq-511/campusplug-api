@@ -1,15 +1,5 @@
 package com.campusplug.api.uploads.cloudinary;
 
-import com.campusplug.api.common.ApiException;
-import com.campusplug.api.listings.ListingEntity;
-import com.campusplug.api.listings.ListingRepository;
-import com.campusplug.api.listings.ListingStatus;
-import com.campusplug.api.uploads.cloudinary.dto.CloudinarySignatureRequest;
-import com.campusplug.api.uploads.cloudinary.dto.CloudinarySignatureResponse;
-import com.campusplug.api.users.UserRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -17,6 +7,17 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+import com.campusplug.api.common.ApiException;
+import com.campusplug.api.listings.ListingEntity;
+import com.campusplug.api.listings.ListingRepository;
+import com.campusplug.api.listings.ListingStatus;
+import com.campusplug.api.uploads.cloudinary.dto.CloudinarySignatureRequest;
+import com.campusplug.api.uploads.cloudinary.dto.CloudinarySignatureResponse;
+import com.campusplug.api.users.UserRepository;
 
 @Service
 public class CloudinarySignatureService {
@@ -59,7 +60,8 @@ public class CloudinarySignatureService {
             timestamp = requestedTimestamp;
         }
 
-        // These params are echoed back to the client so the upload request matches the signature.
+        // Only Cloudinary-recognised signable params go into this map.
+        // max_file_size is NOT a signable parameter — including it causes a SHA1 mismatch → 401.
         Map<String, String> params = new LinkedHashMap<>();
         if (req.getFolder() != null && !req.getFolder().isBlank()) {
             params.put("folder", req.getFolder().trim());
@@ -70,12 +72,13 @@ public class CloudinarySignatureService {
         if (req.getOverwrite() != null) {
             params.put("overwrite", String.valueOf(req.getOverwrite()));
         }
-
-        // Enforce MVP max file size at signature level.
-        params.put("max_file_size", String.valueOf(MAX_FILE_SIZE_BYTES));
         params.put("timestamp", String.valueOf(timestamp));
 
         String signature = sign(params, properties.getApiSecret());
+
+        // Add max_file_size AFTER signing so it is returned to the client as a hint
+        // but is never part of the signed string.
+        params.put("max_file_size", String.valueOf(MAX_FILE_SIZE_BYTES));
         return new CloudinarySignatureResponse(
                 properties.getCloudName(),
                 properties.getApiKey(),
