@@ -100,11 +100,13 @@ public class AuthService {
         try {
             emailService.sendOtpEmail(pending.getEmail(), otp);
         } catch (RuntimeException smtpEx) {
-            // Roll back the pending registration and OTP so retrying starts fresh
             otpStore.deleteOtp(pending.getEmail());
             pendingRegistrationStore.clear(pending.getEmail());
+            boolean isProd = environment.acceptsProfiles(Profiles.of("prod"));
+            String detail = isProd ? "Please try again in a moment."
+                    : "SMTP error: " + smtpEx.getMessage();
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "EMAIL_DELIVERY_FAILED",
-                    "Could not send the verification code. Please try again in a moment.");
+                    "Could not send the verification code. " + detail);
         }
 
         return Map.of(
@@ -255,8 +257,11 @@ public class AuthService {
             emailService.sendOtpEmail(email, otp);
         } catch (RuntimeException smtpEx) {
             otpStore.deleteOtp(email);
+            boolean isProd = environment.acceptsProfiles(Profiles.of("prod"));
+            String detail = isProd ? "Please try again in a moment."
+                    : "SMTP error: " + smtpEx.getMessage();
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "EMAIL_DELIVERY_FAILED",
-                    "Could not send the verification code. Please try again in a moment.");
+                    "Could not send the verification code. " + detail);
         }
 
         String masked = maskEmail(email);
@@ -375,11 +380,12 @@ public class AuthService {
             try {
                 emailService.sendPasswordResetOtpEmail(email, otp);
             } catch (RuntimeException smtpEx) {
-                // SMTP failure: clear the OTP we just stored so it isn't left dangling,
-                // then surface a 503 so the caller knows delivery failed.
                 passwordResetOtpStore.deleteOtp(email);
+                boolean isProdSmtp = environment.acceptsProfiles(Profiles.of("prod"));
+                String detail = isProdSmtp ? "Please try again in a moment."
+                        : "SMTP error: " + smtpEx.getMessage();
                 throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "EMAIL_DELIVERY_FAILED",
-                        "Could not send the reset code. Please try again in a moment.");
+                        "Could not send the reset code. " + detail);
             }
             boolean isProd = environment.acceptsProfiles(Profiles.of("prod"));
             devOtp = isProd ? null : otp;

@@ -5,7 +5,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
+
+import jakarta.annotation.PostConstruct;
 
 @Service
 public class EmailService {
@@ -14,7 +17,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.email.from:noreply@campusplug.local}")
+    @Value("${app.email.from:noreply@campusplug.app}")
     private String from;
 
     @Value("${app.email.enabled:false}")
@@ -31,14 +34,30 @@ public class EmailService {
 
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
-      log.info("[EmailService] initialized");
+    }
+
+    @PostConstruct
+    void logConfig() {
+        int pwLen = 0;
+        if (mailSender instanceof JavaMailSenderImpl impl) {
+            String pw = impl.getPassword();
+            pwLen = (pw == null) ? 0 : pw.length();
+        }
+        log.info("[EmailService] enabled={} host={} port={} username='{}' password-length={}",
+            enabled, safe(mailHost), mailPort, safe(mailUsername), pwLen);
+        if (enabled && (mailUsername == null || mailUsername.isBlank())) {
+            log.error("[EmailService] SMTP_USER is blank — emails will NOT be sent.");
+        }
+        if (enabled && pwLen == 0) {
+            log.error("[EmailService] SMTP_PASSWORD is blank — emails will NOT be sent.");
+        }
     }
 
     public boolean isEnabled() {
-      return enabled;
+        return enabled;
     }
 
-    private void sendPlainTextEmail(String toEmail, String subject, String body, String successLogPrefix) {
+    private void sendPlainTextEmail(String toEmail, String subject, String body, String logPrefix) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(toEmail);
@@ -46,54 +65,35 @@ public class EmailService {
         message.setText(body);
         try {
             mailSender.send(message);
-            log.info("[EmailService] {} {}", successLogPrefix, toEmail);
+            log.info("[EmailService] {} {}", logPrefix, toEmail);
         } catch (RuntimeException e) {
             log.error("[EmailService][SMTP FAILURE] Could not send to {} via {}:{} user='{}': {}",
                 toEmail, safe(mailHost), mailPort, safe(mailUsername), e.getMessage(), e);
-            throw e; // propagate so the caller knows delivery failed
+            throw e;
         }
     }
 
-    /**
-     * Sends a 5-digit OTP to the user's email for login verification.
-     * Synchronous: the caller gets an immediate error if SMTP fails.
-     */
     public void sendOtpEmail(String toEmail, String otp) {
         if (!enabled) {
-            log.warn("[EmailService] Email disabled (app.email.enabled=false) — OTP for {}: {}", toEmail, otp);
-            log.warn(
-                "[EmailService] To enable delivery, set APP_EMAIL_ENABLED=true and configure SMTP. SMTP currently: {}:{} user='{}'",
-                safe(mailHost), mailPort, safe(mailUsername)
-            );
+            log.warn("[EmailService] Email disabled — OTP for {}: {}", toEmail, otp);
             return;
         }
-
         String body = """
-          Tukwataganee login verification code
+                Tukwataganee login verification code
 
                 Your 5-digit code is: %s
                 It expires in 5 minutes.
 
                 If you did not attempt to log in, ignore this message.
                 """.formatted(otp);
-
         sendPlainTextEmail(toEmail, "Tukwataganee login code: " + otp, body, "OTP email sent to");
     }
 
-    /**
-     * Sends a 5-digit password-reset OTP to the user's email.
-     * Synchronous: the caller gets an immediate error if SMTP fails.
-     */
     public void sendPasswordResetOtpEmail(String toEmail, String otp) {
         if (!enabled) {
-            log.warn("[EmailService] Email disabled (app.email.enabled=false) — password reset OTP for {}: {}", toEmail, otp);
-            log.warn(
-                "[EmailService] To enable delivery, set APP_EMAIL_ENABLED=true and configure SMTP. SMTP currently: {}:{} user='{}'",
-                safe(mailHost), mailPort, safe(mailUsername)
-            );
+            log.warn("[EmailService] Email disabled — password reset OTP for {}: {}", toEmail, otp);
             return;
         }
-
         String body = """
                 Tukwatagane password reset code
 
@@ -102,11 +102,11 @@ public class EmailService {
 
                 If you did not request a password reset, ignore this message.
                 """.formatted(otp);
-
         sendPlainTextEmail(toEmail, "Tukwatagane password reset code: " + otp, body, "Password reset OTP email sent to");
     }
 
-      private static String safe(String v) {
+    private static String safe(String v) {
         return v == null ? "" : v;
-      }
+    }
 }
+

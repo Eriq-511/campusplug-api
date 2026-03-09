@@ -40,17 +40,16 @@ spring:
     type: redis
 
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${GMAIL_USER:}
-    password: ${GMAIL_APP_PASSWORD:}
+    host: ${SMTP_HOST:smtp-relay.brevo.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
       mail.smtp.starttls.required: true
-      # Trust Gmail's certificate on cloud/Docker environments
-      mail.smtp.ssl.trust: smtp.gmail.com
-      # Fail fast instead of hanging the async thread
+      # Trust all SMTP hosts (works with Brevo, SendGrid, etc. from Render)
+      mail.smtp.ssl.trust: "*"
       mail.smtp.connectiontimeout: 10000
       mail.smtp.timeout: 10000
       mail.smtp.writetimeout: 10000
@@ -80,7 +79,7 @@ app:
     api-secret: ${CLOUDINARY_API_SECRET:}
 
   email:
-    from: ${GMAIL_USER:noreply@campusplug.local}
+    from: ${APP_EMAIL_FROM:noreply@campusplug.app}
     enabled: ${APP_EMAIL_ENABLED:false}
 
   cache:
