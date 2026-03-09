@@ -29,6 +29,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         } else {
             endpoint.setAllowedOrigins(corsProperties.getAllowedOrigins().toArray(String[]::new));
         }
+
+        endpoint.withSockJS();
     }
 
     @Override
