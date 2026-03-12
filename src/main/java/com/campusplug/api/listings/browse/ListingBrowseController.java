@@ -78,4 +78,12 @@ public class ListingBrowseController {
             @RequestParam(name = "size", defaultValue = "20") int size) {
         return browseService.allByDistance(lat, lng, page, size);
     }
+
+    /** Get single listing detail by ID (for product card click) */
+    @GetMapping("/{id}")
+    public com.campusplug.api.listings.dto.ListingResponse getById(
+            Authentication ignored,
+            @PathVariable("id") Long id) {
+        return browseService.getById(id);
+    }
 }

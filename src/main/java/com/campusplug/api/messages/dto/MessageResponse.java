@@ -7,6 +7,7 @@ public record MessageResponse(
         Long conversationId,
         Long senderUserId,
         String body,
+        Long referencedListingId,  // NEW: which listing this message is about (optional)
         Instant createdAt
 ) {
 }

@@ -15,6 +15,20 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
 
     Optional<ConversationEntity> findByListingIdAndInquirerUserIdAndPosterUserId(Long listingId, Long inquirerUserId, Long posterUserId);
 
+    // NEW: Find conversation between any two participants (regardless of listings)
+    @Query(
+            value = """
+                select c.*
+                from conversations c
+                where (c.inquirer_user_id = :user1 and c.poster_user_id = :user2)
+                   or (c.inquirer_user_id = :user2 and c.poster_user_id = :user1)
+                order by c.created_at asc
+                limit 1
+                """,
+            nativeQuery = true
+    )
+    Optional<ConversationEntity> findByParticipants(@Param("user1") Long user1, @Param("user2") Long user2);
+
     interface ConversationListItemProjection {
         Long getId();
 

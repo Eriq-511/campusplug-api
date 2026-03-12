@@ -7,6 +7,7 @@ public record UserProfileResponse(
         String registrationNumber,
         String phoneNumber,
         String campus,
+        String avatarUrl,
         RegisteredLocation registeredLocation,
         RegisteredLocation alternateLocation
 ) {

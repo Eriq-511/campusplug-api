@@ -116,6 +116,63 @@ public class ListingBrowseService {
         return toPageResponse(result, pageable);
     }
 
+    /** Get single listing detail by ID (product card detail view) */
+    public com.campusplug.api.listings.dto.ListingResponse getById(Long id) {
+        com.campusplug.api.listings.ListingEntity listing = listingRepository.findById(id)
+            .orElseThrow(() -> new ApiException(
+                org.springframework.http.HttpStatus.NOT_FOUND, 
+                "NOT_FOUND", 
+                "Listing not found"
+            ));
+
+        // Only allow viewing ACTIVE listings
+        if (!com.campusplug.api.listings.ListingStatus.ACTIVE.equals(listing.getStatus())) {
+            throw new ApiException(
+                org.springframework.http.HttpStatus.NOT_FOUND,
+                "NOT_FOUND",
+                "Listing not found"
+            );
+        }
+
+        // Load images for this listing
+        List<com.campusplug.api.listings.images.ListingImageEntity> imageEntities =
+                listingImageRepository.findByListingIdOrderByCreatedAtAsc(id);
+        List<com.campusplug.api.listings.images.dto.ListingImageResponse> images = imageEntities.stream()
+                .map(e -> new com.campusplug.api.listings.images.dto.ListingImageResponse(
+                        e.getId(),
+                        e.getPublicId(),
+                        e.getSecureUrl(),
+                        e.getWidth(),
+                        e.getHeight(),
+                        e.getBytes(),
+                        e.getFormat(),
+                        e.getCreatedAt()
+                ))
+                .toList();
+
+        // Convert to response
+        List<com.campusplug.api.listings.images.dto.ListingImageResponse> safeImages = images.isEmpty() ? List.of() : images;
+        String primary = safeImages.isEmpty() ? null : safeImages.get(0).secureUrl();
+        com.campusplug.api.listings.dto.ListingActions actions = com.campusplug.api.listings.dto.ListingActions.forActive();
+
+        return new com.campusplug.api.listings.dto.ListingResponse(
+                listing.getId(),
+                listing.getOwnerUserId(),
+                listing.getTitle(),
+                listing.getPriceUgx(),
+                listing.getCurrency(),
+                listing.getCategoryCode(),
+                listing.getDescription(),
+                listing.getLocationText(),
+                listing.getCampus(),
+                listing.getStatus(),
+                actions,
+                listing.getCreatedAt(),
+                primary,
+                safeImages
+        );
+    }
+
     private ListingPageResponse toPageResponse(Page<ListingRepository.ListingCardProjection> page, Pageable pageable) {
         List<Long> ids = page.getContent().stream()
             .map(ListingRepository.ListingCardProjection::getId)

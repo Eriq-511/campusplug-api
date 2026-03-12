@@ -4,6 +4,7 @@ import com.campusplug.api.users.dto.UpdateUserProfileRequest;
 import com.campusplug.api.users.dto.UserProfileResponse;
 import com.campusplug.api.users.dto.PublicUserProfileResponse;
 import com.campusplug.api.users.dto.UpdateLocationRequest;
+import com.campusplug.api.users.dto.ConfirmAvatarRequest;
 import com.campusplug.api.users.dto.FcmTokenRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -63,5 +64,17 @@ public class UserProfileController {
             @Valid @RequestBody FcmTokenRequest request) {
         userProfileService.updateFcmToken(authentication.getName(), request.getToken());
         return ResponseEntity.ok(Map.of("message", "FCM token registered"));
+    }
+
+    /**
+     * Confirm a profile avatar upload.
+     * Flutter uploads directly to Cloudinary (using a signed URL from POST /uploads/cloudinary/signature
+     * with uploadContext=AVATAR), then calls this endpoint with the resulting secure_url and public_id.
+     */
+    @PutMapping("/profile/avatar")
+    public UserProfileResponse updateAvatar(
+            Authentication authentication,
+            @Valid @RequestBody ConfirmAvatarRequest request) {
+        return userProfileService.updateAvatar(authentication.getName(), request);
     }
 }

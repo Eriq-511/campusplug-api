@@ -14,6 +14,7 @@ public record PublicUserProfileResponse(
         Long id,
         String fullName,
         String campus,
+        String avatarUrl,
         long activeListingsCount,
         Instant memberSince
 ) {

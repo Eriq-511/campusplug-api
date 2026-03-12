@@ -4,7 +4,16 @@ import jakarta.validation.constraints.NotNull;
 
 public class CloudinarySignatureRequest {
 
+    public enum UploadContext { LISTING, AVATAR }
+
+    /**
+     * Determines what is being uploaded.
+     * Defaults to LISTING for backwards compatibility.
+     */
     @NotNull
+    private UploadContext uploadContext = UploadContext.LISTING;
+
+    /** Required when uploadContext == LISTING; ignored for AVATAR. */
     private Long listingId;
 
     /** Optional folder for Cloudinary upload (e.g. "campusplug/listings/123"). */
@@ -25,6 +34,14 @@ public class CloudinarySignatureRequest {
 
     public void setListingId(Long listingId) {
         this.listingId = listingId;
+    }
+
+    public UploadContext getUploadContext() {
+        return uploadContext;
+    }
+
+    public void setUploadContext(UploadContext uploadContext) {
+        this.uploadContext = uploadContext;
     }
 
     public String getFolder() {

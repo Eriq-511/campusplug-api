@@ -17,13 +17,29 @@
 4. [Error Handling](#4-error-handling)
 5. [Auth Endpoints](#5-auth-endpoints)
 6. [Users Endpoints](#6-users-endpoints)
+   - [6.1 Get Own Profile](#61-get-own-profile)
+   - [6.2 Get Public Profile](#62-get-public-profile)
+   - [6.3 Update Own Profile](#63-update-own-profile)
+   - [6.4 Update Live Location](#64-update-live-location)
+   - [6.5 Register FCM Token](#65-register-fcm-token)
+   - [6.6 Update Avatar](#66-update-avatar)
 7. [Listings — Owner Actions](#7-listings--owner-actions)
 8. [Listings — Browse / Public](#8-listings--browse--public)
+   - [8.1 Full-Text Search](#81-full-text-search)
+   - [8.2 Nearby Listings](#82-nearby-listings)
+   - [8.3 Feed (All Listings Sorted by Distance)](#83-feed-all-listings-sorted-by-distance)
+   - [8.4 Listings in a Campus Zone](#84-listings-in-a-campus-zone)
+   - [8.5 Get Listing Detail](#85-get-listing-detail)
+   - [8.6 Count Active Listings in Zone](#86-count-active-listings-in-zone)
 9. [Categories Endpoints](#9-categories-endpoints)
 10. [Bookmarks Endpoints](#10-bookmarks-endpoints)
 11. [Conversations Endpoints](#11-conversations-endpoints)
 12. [Messages Endpoints](#12-messages-endpoints)
 13. [Image Uploads (Cloudinary)](#13-image-uploads-cloudinary)
+    - [13.1 Get Upload Signature](#131-get-upload-signature)
+    - [13.2 Upload to Cloudinary](#132-upload-to-cloudinary)
+    - [13.3 Attach to Listing](#133-attach-to-listing)
+    - [13.4 Avatar Upload Flow](#134-avatar-upload-flow)
 14. [Geo / Geocoding Endpoints](#14-geo--geocoding-endpoints)
 15. [Zones Endpoints](#15-zones-endpoints)
 16. [Location Check Endpoint](#16-location-check-endpoint)
@@ -596,6 +612,7 @@ Future<void> logout() async {
   "registrationNumber": "2026/BIT/123",
   "phoneNumber": "+256700000001",
   "campus": "main",
+  "avatarUrl": "https://res.cloudinary.com/your-cloud/image/upload/campusplug/avatars/1/profile.jpg",
   "registeredLocation": {
     "label": "MUST Main Campus",
     "lat": -0.6089,
@@ -635,6 +652,7 @@ Future<UserProfile> getMyProfile() async {
   "id": 2,
   "fullName": "Bob Mugisha",
   "campus": "MUST Main",
+  "avatarUrl": "https://res.cloudinary.com/your-cloud/image/upload/campusplug/avatars/2/profile.jpg",
   "activeListingsCount": 5,
   "memberSince": "2025-09-01T08:00:00Z"
 }
@@ -734,6 +752,53 @@ Future<void> registerFcmToken() async {
   final fcmToken = await FirebaseMessaging.instance.getToken();
   if (fcmToken == null) return;
   await apiClient.dio.put('/users/fcm-token', data: {'token': fcmToken});
+}
+```
+
+---
+
+### 6.6 Update Avatar
+
+> Full upload flow: request a signature from the server, upload the image directly to Cloudinary, then confirm the upload by calling this endpoint.  
+> See [Section 13.4](#134-avatar-upload-flow) for the complete step-by-step process.
+
+**`PUT /api/v1/users/profile/avatar`**
+
+**Request body**
+
+```json
+{
+  "avatarUrl": "https://res.cloudinary.com/your-cloud/image/upload/campusplug/avatars/1/profile.jpg",
+  "avatarPublicId": "campusplug/avatars/1/profile"
+}
+```
+
+> Both `avatarUrl` and `avatarPublicId` are validated server-side.  
+> `avatarPublicId` **must** match `campusplug/avatars/{userId}/profile` exactly.  
+> `avatarUrl` **must** originate from Cloudinary and reference that same public ID.  
+> Attempting to supply an arbitrary URL or public ID returns `400 INVALID_AVATAR_PUBLIC_ID` / `400 INVALID_AVATAR_URL`.
+
+**Expected response** `200` — full `UserProfile` object (same shape as 6.1, `avatarUrl` now populated)
+
+**Flutter**
+
+```dart
+Future<UserProfile> updateAvatar(XFile imageFile) async {
+  // Step 1 — get a server-signed upload signature (no listingId needed for avatar)
+  final sigResp = await apiClient.dio.post('/uploads/cloudinary/signature', data: {
+    'uploadContext': 'AVATAR',
+  });
+  final sig = CloudinarySignatureResponse.fromJson(sigResp.data);
+
+  // Step 2 — upload directly to Cloudinary
+  final cloudResult = await uploadToCloudinary(imageFile: imageFile, sig: sig);
+
+  // Step 3 — confirm the upload and persist
+  final resp = await apiClient.dio.put('/users/profile/avatar', data: {
+    'avatarUrl':      cloudResult['secure_url'],
+    'avatarPublicId': cloudResult['public_id'],
+  });
+  return UserProfile.fromJson(resp.data);
 }
 ```
 
@@ -1081,7 +1146,94 @@ Future<ListingPage> searchListings({
 
 ---
 
-### 8.5 Count Active Listings in Zone
+### 8.5 Get Listing Detail
+
+**`GET /api/v1/listings/{id}`**
+
+Fetch a single **ACTIVE** listing with full details (title, description, images, price, owner info). Called when a user taps on a product card from browse UI.
+
+**Path params**
+
+| Param | Type | Example |
+|---|---|---|
+| `id` | Long | `101` |
+
+**Expected response** `200`
+
+```json
+{
+  "id": 101,
+  "ownerUserId": 5,
+  "title": "HP EliteBook 840 G6",
+  "priceUgx": 1800000,
+  "currency": "UGX",
+  "categoryCode": "ELECTRONICS",
+  "description": "Used HP EliteBook in perfect condition. Minimal scratches, battery life 4+ hours. Charger included.Comes with Windows 10 Pro.",
+  "locationText": "Block A Hostel, MUST",
+  "campus": "MUST Main",
+  "status": "ACTIVE",
+  "actions": {
+    "canEdit": false,
+    "canDelete": false,
+    "canMarkSold": false,
+    "canRestore": false,
+    "canPurge": false,
+    "canViewOwnerPhone": true
+  },
+  "createdAt": "2026-03-07T10:00:00Z",
+  "primaryImageUrl": "https://res.cloudinary.com/.../image1.jpg",
+  "images": [
+    {
+      "id": 201,
+      "publicId": "campusplug/listings/img_xyz1",
+      "secureUrl": "https://res.cloudinary.com/.../image1.jpg",
+      "width": 1920,
+      "height": 1440,
+      "bytes": 2048576,
+      "format": "jpg",
+      "createdAt": "2026-03-07T10:00:00Z"
+    },
+    {
+      "id": 202,
+      "publicId": "campusplug/listings/img_xyz2",
+      "secureUrl": "https://res.cloudinary.com/.../image2.jpg",
+      "width": 1920,
+      "height": 1440,
+      "bytes": 1843200,
+      "format": "jpg",
+      "createdAt": "2026-03-07T10:01:00Z"
+    }
+  ]
+}
+```
+
+**Error responses**
+
+| Status | Code | Message |
+|---|---|---|
+| `404` | `NOT_FOUND` | Listing not found |
+| `404` | `NOT_FOUND` | Return 404 if listing status is not `ACTIVE` (sold, archived) |
+
+**Flutter**
+
+```dart
+Future<ListingResponse> getListingDetail(Long id) async {
+  final resp = await apiClient.dio.get('/listings/$id');
+  return ListingResponse.fromJson(resp.data);
+}
+
+// Usage: when user taps a product card
+void onProductCardTap(BuildContext ctx, int listingId) {
+  final listing = await getListingDetail(listingId);
+  Navigator.push(ctx, MaterialPageRoute(
+    builder: (_) => ListingDetailPage(listing: listing),
+  ));
+}
+```
+
+---
+
+### 8.6 Count Active Listings in Zone
 
 **`GET /api/v1/listings/zone/{tag}/count`**
 
@@ -1214,7 +1366,7 @@ Future<void> removeBookmark(int listingId) async {
 
 ### 11.1 Create or Get Conversation
 
-> Sending a message about a listing starts a conversation. If a conversation for this (user, listing) pair already exists, the existing one is returned.
+> **NEW BEHAVIOR**: Creates a **unified conversation thread** between two users. All messages between the same two participants go to one conversation, regardless of which listings they discuss. If a conversation already exists between these users, it returns the existing one.
 
 **`POST /api/v1/conversations`**
 
@@ -1224,19 +1376,31 @@ Future<void> removeBookmark(int listingId) async {
 { "listingId": 101 }
 ```
 
+> The `listingId` identifies which listing triggered the conversation, but the actual conversation is **participant-based**. If User A and User B already have a conversation, this returns the existing conversation ID regardless of listing.
+
 **Expected response** `200` or `201`
 
 ```json
 {
   "id": 5,
-  "listingId": 101,
-  "listingTitle": "HP EliteBook 840 G6",
+  "listingId": 85,
+  "listingTitle": "iPhone 13 Pro",
   "inquirerUserId": 2,
   "posterUserId": 1,
   "createdAt": "2026-03-07T15:00:00Z",
   "updatedAt": "2026-03-07T15:00:00Z"
 }
 ```
+
+> **Note**: `listingId` and `listingTitle` reflect the **first listing** that started this conversation between these two users. The current `listingId` from the request is used for validation only.
+
+**Behavior Examples**:
+
+- User A messages User B about Product #101 → **Conversation #5 created**
+- User A messages User B about Product #202 → **Same Conversation #5 returned** 
+- User C messages User B about Product #101 → **New Conversation #8 created**
+
+This creates a **WhatsApp/Facebook Marketplace experience** where each user pair has one unified chat thread.
 
 ---
 
@@ -1293,9 +1457,13 @@ Future<void> removeBookmark(int listingId) async {
 **Request body**
 
 ```json
-{ "body": "Is it still available?" }
+{
+  "body": "Is it still available?",
+  "referencedListingId": 101
+}
 ```
 
+> **NEW**: `referencedListingId` is **optional** and provides context about which listing the message discusses. In unified conversations, users can reference different listings within the same chat thread.
 > Maximum message length: 2000 characters.
 
 **Expected response** `201`
@@ -1306,11 +1474,29 @@ Future<void> removeBookmark(int listingId) async {
   "conversationId": 5,
   "senderUserId": 2,
   "body": "Is it still available?",
+  "referencedListingId": 101,
   "createdAt": "2026-03-07T15:05:00Z"
 }
 ```
 
 > The backend also broadcasts this to `/topic/conversations.5` via STOMP.
+
+**Flutter**
+
+```dart
+// Send message with product context
+Future<MessageResponse> sendMessage(int conversationId, String message, {int? listingId}) async {
+  final resp = await apiClient.dio.post('/conversations/$conversationId/messages', data: {
+    'body': message,
+    if (listingId != null) 'referencedListingId': listingId,
+  });
+  return MessageResponse.fromJson(resp.data);
+}
+
+// Usage examples:
+await sendMessage(5, "Is this still available?", listingId: 101);  // Reference specific product
+await sendMessage(5, "Thanks for the quick response!");             // General message
+```
 
 ---
 
@@ -1334,17 +1520,55 @@ Future<void> removeBookmark(int listingId) async {
       "conversationId": 5,
       "senderUserId": 2,
       "body": "Is it still available?",
+      "referencedListingId": 101,
       "createdAt": "2026-03-07T15:05:00Z"
+    },
+    {
+      "id": 51,
+      "conversationId": 5,
+      "senderUserId": 1,
+      "body": "Yes, it's still available! When can you meet?",
+      "referencedListingId": null,
+      "createdAt": "2026-03-07T15:06:00Z"
     }
   ]
 }
 ```
+
+> **NEW**: Each message now includes `referencedListingId` to show which product is being discussed (if any). This helps users understand context in unified conversations.
 
 ---
 
 ### 12.3 Long-Poll for New Messages
 
 > Use this as a fallback if WebSocket is unavailable (e.g. background state). The server holds the connection open for up to `timeoutSeconds` and returns as soon as a new message arrives.
+
+**`GET /api/v1/conversations/{conversationId}/messages/long-poll`**
+
+**Query params**
+
+| Param | Required | Type | Notes |
+|---|---|---|---|
+| `afterMessageId` | **Yes** | Long | Only return messages with ID > this value |
+| `timeoutSeconds` | No | int (default 25) | Max time to wait |
+
+**Expected response** `200` — same `MessageListResponse` as 12.2 with `referencedListingId` fields
+
+**Flutter**
+
+```dart
+Future<List<MessageResponse>> longPollMessages(int conversationId, int afterMessageId) async {
+  final resp = await apiClient.dio.get(
+    '/conversations/$conversationId/messages/long-poll',
+    queryParameters: {
+      'afterMessageId': afterMessageId,
+      'timeoutSeconds': 30,
+    },
+  );
+  final list = MessageListResponse.fromJson(resp.data);
+  return list.items;
+}
+```
 
 **`GET /api/v1/conversations/{conversationId}/messages/long-poll`**
 
@@ -1380,7 +1604,7 @@ Future<void> removeBookmark(int listingId) async {
 > Uploads go **directly to Cloudinary** from the app — never through the backend server.  
 > The backend only provides a **signed upload signature** and stores the resulting `publicId`/`secureUrl`.
 
-### Full upload flow
+### Full upload flow (listing image)
 
 ```
 1. App picks image (image_picker)
@@ -1396,7 +1620,10 @@ Future<void> removeBookmark(int listingId) async {
 
 **`POST /api/v1/uploads/cloudinary/signature`**
 
-**Request body**
+> **Avatar uploads** must include `"uploadContext": "AVATAR"`. `listingId` is not required and will be ignored.  
+> **Listing image uploads** (default) must include `"uploadContext": "LISTING"` or omit `uploadContext`.
+
+**Request body — listing image**
 
 ```json
 {
@@ -1407,7 +1634,17 @@ Future<void> removeBookmark(int listingId) async {
 }
 ```
 
-> `timestamp` is optional — the server uses the current Unix time if omitted.
+**Request body — avatar**
+
+```json
+{
+  "uploadContext": "AVATAR"
+}
+```
+
+> For avatar uploads the server automatically locks the upload path to  
+> `campusplug/avatars/{yourUserId}/profile` with `overwrite: true`.  
+> You do **not** need to — and should not — specify `folder`, `publicId`, or `listingId`.
 
 **Expected response** `200`
 
@@ -1468,6 +1705,60 @@ Future<ListingResponse> attachImage(int listingId, Map<String, dynamic> cloudina
   return ListingResponse.fromJson(resp.data);
 }
 ```
+
+---
+
+### 13.4 Avatar Upload Flow
+
+> The avatar uses the same Cloudinary direct-upload pattern as listing images, but the server **locks** the upload destination to `campusplug/avatars/{userId}/profile` and sets `overwrite: true` automatically.
+
+```
+1. App calls POST /api/v1/uploads/cloudinary/signature  with body { "uploadContext": "AVATAR" }
+   → server returns { signature, apiKey, timestamp, cloudName, params }
+   → params will contain: folder, public_id, overwrite = "true"
+2. App uploads image multipart directly to Cloudinary (same helper as listing images)
+3. App calls PUT /api/v1/users/profile/avatar with { avatarUrl, avatarPublicId } from Cloudinary result
+   → server re-validates that public_id and URL match the expected path before saving
+```
+
+**Step 1 — Request signature**
+
+```dart
+final sigResp = await apiClient.dio.post('/uploads/cloudinary/signature', data: {
+  'uploadContext': 'AVATAR',
+  // listingId is ignored for AVATAR context — do not include it
+});
+final sig = CloudinarySignatureResponse.fromJson(sigResp.data);
+// sig.params will include:
+//   folder    → "campusplug/avatars/1"
+//   public_id → "campusplug/avatars/1/profile"
+//   overwrite → "true"
+```
+
+**Step 2 — Upload to Cloudinary** *(reuse the same helper from 13.2)*
+
+```dart
+final cloudResult = await uploadToCloudinary(imageFile: pickedImage, sig: sig);
+// cloudResult['public_id']  → "campusplug/avatars/1/profile"
+// cloudResult['secure_url'] → "https://res.cloudinary.com/your-cloud/image/upload/.../campusplug/avatars/1/profile.jpg"
+```
+
+**Step 3 — Confirm avatar**
+
+```dart
+final profileResp = await apiClient.dio.put('/users/profile/avatar', data: {
+  'avatarUrl':      cloudResult['secure_url'],
+  'avatarPublicId': cloudResult['public_id'],
+});
+final updatedProfile = UserProfile.fromJson(profileResp.data);
+```
+
+**Error responses**
+
+| Code | Meaning |
+|---|---|
+| `400 INVALID_AVATAR_PUBLIC_ID` | `avatarPublicId` does not match the server-expected path for this user |
+| `400 INVALID_AVATAR_URL` | `avatarUrl` does not originate from Cloudinary or does not reference the expected public ID |
 
 ---
 
@@ -1904,17 +2195,18 @@ class UserProfile {
   final String registrationNumber;
   final String? phoneNumber;
   final String? campus;
+  final String? avatarUrl;
   final RegisteredLocationDto? registeredLocation;
   final RegisteredLocationDto? alternateLocation;
 
   const UserProfile({required this.id, required this.fullName, required this.email,
     required this.registrationNumber, this.phoneNumber, this.campus,
-    this.registeredLocation, this.alternateLocation});
+    this.avatarUrl, this.registeredLocation, this.alternateLocation});
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
     id: j['id'], fullName: j['fullName'], email: j['email'],
     registrationNumber: j['registrationNumber'], phoneNumber: j['phoneNumber'],
-    campus: j['campus'],
+    campus: j['campus'], avatarUrl: j['avatarUrl'],
     registeredLocation: j['registeredLocation'] != null
         ? RegisteredLocationDto.fromJson(j['registeredLocation']) : null,
     alternateLocation: j['alternateLocation'] != null
@@ -1926,17 +2218,31 @@ class PublicUserProfile {
   final int id;
   final String fullName;
   final String? campus;
+  final String? avatarUrl;
   final int activeListingsCount;
   final DateTime memberSince;
 
   const PublicUserProfile({required this.id, required this.fullName, this.campus,
-    required this.activeListingsCount, required this.memberSince});
+    this.avatarUrl, required this.activeListingsCount, required this.memberSince});
 
   factory PublicUserProfile.fromJson(Map<String, dynamic> j) => PublicUserProfile(
     id: j['id'], fullName: j['fullName'], campus: j['campus'],
+    avatarUrl: j['avatarUrl'],
     activeListingsCount: j['activeListingsCount'],
     memberSince: DateTime.parse(j['memberSince']),
   );
+}
+
+class ConfirmAvatarRequest {
+  final String avatarUrl;
+  final String avatarPublicId;
+
+  const ConfirmAvatarRequest({required this.avatarUrl, required this.avatarPublicId});
+
+  Map<String, dynamic> toJson() => {
+    'avatarUrl':      avatarUrl,
+    'avatarPublicId': avatarPublicId,
+  };
 }
 
 // ─────────────────────────────────────────────────────
@@ -2151,20 +2457,58 @@ class ConversationListItem {
       );
 }
 
+```dart
+// Enhanced MessageResponse with listing context
 class MessageResponse {
   final int id;
   final int conversationId;
   final int senderUserId;
   final String body;
+  final int? referencedListingId;  // NEW: which product this message references (optional)
   final DateTime createdAt;
 
   const MessageResponse({required this.id, required this.conversationId,
-    required this.senderUserId, required this.body, required this.createdAt});
+    required this.senderUserId, required this.body, this.referencedListingId, required this.createdAt});
 
   factory MessageResponse.fromJson(Map<String, dynamic> j) => MessageResponse(
     id: j['id'], conversationId: j['conversationId'],
     senderUserId: j['senderUserId'], body: j['body'],
+    referencedListingId: j['referencedListingId'],
     createdAt: DateTime.parse(j['createdAt']),
+  );
+}
+
+// Send message request with optional listing reference
+class SendMessageRequest {
+  final String body;
+  final int? referencedListingId;
+
+  SendMessageRequest({required this.body, this.referencedListingId});
+
+  Map<String, dynamic> toJson() => {
+    'body': body,
+    if (referencedListingId != null) 'referencedListingId': referencedListingId,
+  };
+}
+
+// Conversation management classes
+class ConversationResponse {
+  final int id;
+  final int listingId;  // First listing that started this conversation
+  final String listingTitle;
+  final int inquirerUserId;  // User who initiated the conversation
+  final int posterUserId;   // User who posted the original listing
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const ConversationResponse({required this.id, required this.listingId,
+    required this.listingTitle, required this.inquirerUserId, required this.posterUserId,
+    required this.createdAt, required this.updatedAt});
+
+  factory ConversationResponse.fromJson(Map<String, dynamic> j) => ConversationResponse(
+    id: j['id'], listingId: j['listingId'], listingTitle: j['listingTitle'],
+    inquirerUserId: j['inquirerUserId'], posterUserId: j['posterUserId'],
+    createdAt: DateTime.parse(j['createdAt']), updatedAt: DateTime.parse(j['updatedAt']),
   );
 }
 
@@ -2263,6 +2607,7 @@ class CloudinarySignatureResponse {
 | `POST` | `/api/v1/auth/reset-password` | No | Complete password reset |
 | `GET` | `/api/v1/users/profile` | Yes | Get own profile |
 | `PUT` | `/api/v1/users/profile` | Yes | Update own profile |
+| `PUT` | `/api/v1/users/profile/avatar` | Yes | Confirm avatar upload after Cloudinary direct upload |
 | `GET` | `/api/v1/users/{id}/public` | Yes | Get public profile |
 | `PUT` | `/api/v1/users/location` | Yes | Update live location |
 | `PUT` | `/api/v1/users/fcm-token` | Yes | Register FCM device token |
@@ -2300,12 +2645,12 @@ class CloudinarySignatureResponse {
 
 ## 21. Full Buyer–Seller Conversation Walkthrough
 
-> **Simulation / Guideline** — This section shows the complete end-to-end flow as a sequence of HTTP requests and responses. It is not a code template; it illustrates what data moves between the Flutter app and the backend at each stage.
+> **Updated for Unified Conversations** — This section demonstrates the new participant-based conversation system where all messages between two users go to one unified thread regardless of which products they discuss.
 
 ### Scenario
-- **Alice** (seller) lists a MacBook and waits for buyers.
-- **Bob** (buyer) finds the listing, opens a conversation, and sends a message.
-- Both sides communicate in real time via STOMP, with long-poll as fallback.
+- **Alice** (seller) lists multiple items (MacBook, iPhone)
+- **Bob** (buyer) wants both items  
+- **New Behavior**: All of Bob's messages to Alice go to **one conversation** regardless of which product initiated it
 
 ---
 
@@ -2375,7 +2720,7 @@ Same 3-step OTP flow as Steps 1–3, using Bob's credentials (`bob.buyer@std.mus
 
 ---
 
-### Step 5 — Alice creates a listing
+### Step 5 — Alice creates MacBook listing
 
 **Request** `POST /api/v1/listings` *(with `Authorization: Bearer <sellerToken>`)*
 ```json
@@ -2405,6 +2750,30 @@ Same 3-step OTP flow as Steps 1–3, using Bob's credentials (`bob.buyer@std.mus
 
 ---
 
+### Step 5.1 — Alice creates iPhone listing
+
+**Request** `POST /api/v1/listings` *(with `Authorization: Bearer <sellerToken>`)*
+```json
+{
+  "title": "iPhone 13 Pro",
+  "priceUgx": 2800000,
+  "categoryCode": "ELECTRONICS",
+  "description": "Excellent condition, includes box and charger"
+}
+```
+**Response** `200`
+```json
+{
+  "id": 11,
+  "ownerUserId": 1,
+  "title": "iPhone 13 Pro",
+  "priceUgx": 2800000,
+  "status": "ACTIVE"
+}
+```
+
+---
+
 ### Step 6 — Both connect to WebSocket
 
 Alice and Bob each establish a STOMP connection using their respective tokens (see [Section 17](#17-websocket--real-time-messaging) for connection details). Once connected, they subscribe to:
@@ -2417,13 +2786,13 @@ Alice and Bob each establish a STOMP connection using their respective tokens (s
 
 ---
 
-### Step 7 — Bob opens a conversation about the listing
+### Step 7 — Bob starts conversation about MacBook
 
 **Request** `POST /api/v1/conversations` *(with `Authorization: Bearer <buyerToken>`)*
 ```json
 { "listingId": 10 }
 ```
-**Response** `200`
+**Response** `201` — **New unified conversation created**
 ```json
 {
   "id": 5,
@@ -2435,15 +2804,18 @@ Alice and Bob each establish a STOMP connection using their respective tokens (s
   "updatedAt": "2026-03-07T10:05:00Z"
 }
 ```
-> If a conversation between these two users for this listing already exists, the same conversation is returned — no duplicate is created.
+> **New Behavior**: This creates a conversation between Bob and Alice. Any future messages between them will use this same conversation regardless of which product triggers it.
 
 ---
 
-### Step 8 — Bob sends the first message
+### Step 8 — Bob sends message about MacBook
 
 **Request** `POST /api/v1/conversations/5/messages` *(with `Authorization: Bearer <buyerToken>`)*
 ```json
-{ "body": "Hi, is this still available?" }
+{
+  "body": "Hi, is the MacBook still available?",
+  "referencedListingId": 10
+}
 ```
 **Response** `201`
 ```json
@@ -2451,8 +2823,118 @@ Alice and Bob each establish a STOMP connection using their respective tokens (s
   "id": 50,
   "conversationId": 5,
   "senderUserId": 2,
-  "body": "Hi, is this still available?",
+  "body": "Hi, is the MacBook still available?",
+  "referencedListingId": 10,
   "createdAt": "2026-03-07T10:06:00Z"
+}
+```
+
+---
+
+### Step 9 — Alice replies
+
+**Request** `POST /api/v1/conversations/5/messages` *(with `Authorization: Bearer <sellerToken>`)*
+```json
+{
+  "body": "Yes, it's still available! When would you like to see it?",
+  "referencedListingId": 10
+}
+```
+
+---
+
+### Step 10 — Bob asks about iPhone (same conversation!)
+
+**Request** `POST /api/v1/conversations` *(with `Authorization: Bearer <buyerToken>`)*
+```json
+{ "listingId": 11 }
+```
+**Response** `200` — **Same conversation returned!**
+```json
+{
+  "id": 5,
+  "listingId": 10,
+  "listingTitle": "MacBook Pro 2021", 
+  "inquirerUserId": 2,
+  "posterUserId": 1,
+  "createdAt": "2026-03-07T10:05:00Z",
+  "updatedAt": "2026-03-07T10:05:00Z"
+}
+```
+> **Key Insight**: Notice the conversation ID is still `5`! The `listingId` and `listingTitle` show the **first product** that started this conversation, but Bob can now discuss the iPhone in the same thread.
+
+---
+
+### Step 11 — Bob asks about iPhone in same thread
+
+**Request** `POST /api/v1/conversations/5/messages` *(with `Authorization: Bearer <buyerToken>`)*
+```json
+{
+  "body": "Also interested in your iPhone 13 Pro. Bundle deal possible?",
+  "referencedListingId": 11
+}
+```
+**Response** `201`
+```json
+{
+  "id": 52,
+  "conversationId": 5,
+  "senderUserId": 2,
+  "body": "Also interested in your iPhone 13 Pro. Bundle deal possible?", 
+  "referencedListingId": 11,
+  "createdAt": "2026-03-07T10:12:00Z"
+}
+```
+
+---
+
+### Step 12 — View unified conversation
+
+**Request** `GET /api/v1/conversations/5/messages`
+
+**Response** `200` — **Shows both products in one thread**
+```json
+{
+  "items": [
+    {
+      "id": 50,
+      "body": "Hi, is the MacBook still available?",
+      "referencedListingId": 10,
+      "senderUserId": 2,
+      "createdAt": "2026-03-07T10:06:00Z"
+    },
+    {
+      "id": 51,
+      "body": "Yes, it's still available! When would you like to see it?",
+      "referencedListingId": 10,
+      "senderUserId": 1,
+      "createdAt": "2026-03-07T10:08:00Z"
+    },
+    {
+      "id": 52,
+      "body": "Also interested in your iPhone 13 Pro. Bundle deal possible?",
+      "referencedListingId": 11,
+      "senderUserId": 2,
+      "createdAt": "2026-03-07T10:12:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## **Unified Conversations Summary**
+
+✅ **Before**: Bob messaging about MacBook and iPhone would create 2 separate conversations  
+✅ **After**: Bob and Alice have **1 unified conversation** that can discuss multiple products  
+✅ **Product Context**: Each message includes `referencedListingId` to show which item is being discussed  
+✅ **Clean UX**: No duplicate chat threads — same experience as WhatsApp/Facebook Marketplace
+
+**Key Benefits**:
+- Users maintain **one conversation per person** regardless of how many products they discuss
+- Individual messages can reference specific products for context
+- Natural conversation flow without artificial boundaries
+- Simplified conversation management UI
 }
 ```
 > The backend simultaneously broadcasts this payload to `/topic/conversations.5` via STOMP. Alice's STOMP subscription receives it in real time — no polling needed.
@@ -2463,7 +2945,10 @@ Alice and Bob each establish a STOMP connection using their respective tokens (s
 
 **Request** `POST /api/v1/conversations/5/messages` *(with `Authorization: Bearer <sellerToken>`)*
 ```json
-{ "body": "Yes, still available! When can you come?" }
+{
+  "body": "Yes, still available! When can you come?",
+  "referencedListingId": 10
+}
 ```
 **Response** `201`
 ```json
@@ -2472,6 +2957,7 @@ Alice and Bob each establish a STOMP connection using their respective tokens (s
   "conversationId": 5,
   "senderUserId": 1,
   "body": "Yes, still available! When can you come?",
+  "referencedListingId": 10,
   "createdAt": "2026-03-07T10:07:00Z"
 }
 ```
@@ -2487,8 +2973,22 @@ Alice and Bob each establish a STOMP connection using their respective tokens (s
 ```json
 {
   "items": [
-    { "id": 50, "conversationId": 5, "senderUserId": 2, "body": "Hi, is this still available?", "createdAt": "2026-03-07T10:06:00Z" },
-    { "id": 51, "conversationId": 5, "senderUserId": 1, "body": "Yes, still available! When can you come?", "createdAt": "2026-03-07T10:07:00Z" }
+    {
+      "id": 50,
+      "conversationId": 5,
+      "senderUserId": 2,
+      "body": "Hi, is this still available?",
+      "referencedListingId": 10,
+      "createdAt": "2026-03-07T10:06:00Z"
+    },
+    {
+      "id": 51,
+      "conversationId": 5,
+      "senderUserId": 1,
+      "body": "Yes, still available! When can you come?",
+      "referencedListingId": 10,
+      "createdAt": "2026-03-07T10:07:00Z"
+    }
   ]
 }
 ```
@@ -2505,7 +3005,14 @@ If the WebSocket connection drops (e.g. app goes to background), use long-poll t
 ```json
 {
   "items": [
-    { "id": 52, "conversationId": 5, "senderUserId": 2, "body": "Tomorrow afternoon works!", "createdAt": "2026-03-07T10:30:00Z" }
+    {
+      "id": 52,
+      "conversationId": 5,
+      "senderUserId": 2,
+      "body": "Tomorrow afternoon works!",
+      "referencedListingId": null,
+      "createdAt": "2026-03-07T10:30:00Z"
+    }
   ]
 }
 ```

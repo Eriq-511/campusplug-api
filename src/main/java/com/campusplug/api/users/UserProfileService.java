@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.campusplug.api.common.ApiException;
 import com.campusplug.api.listings.ListingRepository;
 import com.campusplug.api.listings.ListingStatus;
+import com.campusplug.api.uploads.cloudinary.CloudinaryProperties;
+import com.campusplug.api.users.dto.ConfirmAvatarRequest;
 import com.campusplug.api.users.dto.PublicUserProfileResponse;
 import com.campusplug.api.users.dto.RegisteredLocationDto;
 import com.campusplug.api.users.dto.UpdateLocationRequest;
@@ -25,13 +27,16 @@ public class UserProfileService {
     private final UserRepository userRepository;
     private final ListingRepository listingRepository;
     private final LocationCheckService locationCheckService;
+    private final CloudinaryProperties cloudinaryProperties;
 
     public UserProfileService(UserRepository userRepository,
                               ListingRepository listingRepository,
-                              LocationCheckService locationCheckService) {
+                              LocationCheckService locationCheckService,
+                              CloudinaryProperties cloudinaryProperties) {
         this.userRepository = userRepository;
         this.listingRepository = listingRepository;
         this.locationCheckService = locationCheckService;
+        this.cloudinaryProperties = cloudinaryProperties;
     }
 
     public UserProfileResponse getProfile(String email) {
@@ -152,6 +157,7 @@ public class UserProfileService {
                 p.getRegistrationNumber(),
                 p.getPhoneNumber(),
                 p.getCampus(),
+                p.getAvatarUrl(),
             location,
             alternate
         );
@@ -173,6 +179,7 @@ public class UserProfileService {
                 p.getId(),
                 p.getFullName(),
                 p.getCampus(),
+                p.getAvatarUrl(),
                 activeListings,
                 p.getCreatedAt()
         );
@@ -196,6 +203,37 @@ public class UserProfileService {
         UserEntity user = userRepository.findByEmailIgnoreCase(normalizeEmail(email))
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not found"));
         userRepository.updateFcmToken(user.getId(), token);
+    }
+
+    // Avatar — persist the Cloudinary URL after client-side upload
+    @Transactional
+    public UserProfileResponse updateAvatar(String email, ConfirmAvatarRequest req) {
+        UserEntity user = userRepository.findByEmailIgnoreCase(normalizeEmail(email))
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not found"));
+
+        String avatarUrl = req.getAvatarUrl().trim();
+        String avatarPublicId = req.getAvatarPublicId().trim();
+        validateAvatarUpload(user.getId(), avatarUrl, avatarPublicId);
+
+        userRepository.updateAvatar(user.getId(), avatarUrl, avatarPublicId);
+        return getProfile(email);
+    }
+
+    private void validateAvatarUpload(Long userId, String avatarUrl, String avatarPublicId) {
+        String expectedPublicId = "campusplug/avatars/" + userId + "/profile";
+        if (!expectedPublicId.equals(avatarPublicId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_AVATAR_PUBLIC_ID", "avatarPublicId does not match the signed avatar upload target");
+        }
+
+        String cloudName = cloudinaryProperties.getCloudName();
+        if (cloudName == null || cloudName.isBlank()) {
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "CLOUDINARY_NOT_CONFIGURED", "Cloudinary is not configured");
+        }
+
+        String expectedUrlPrefix = "https://res.cloudinary.com/" + cloudName.trim() + "/image/upload/";
+        if (!avatarUrl.startsWith(expectedUrlPrefix) || !avatarUrl.contains("/" + expectedPublicId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_AVATAR_URL", "avatarUrl does not match the signed Cloudinary upload target");
+        }
     }
 
     private static String normalizePhone(String phone) {

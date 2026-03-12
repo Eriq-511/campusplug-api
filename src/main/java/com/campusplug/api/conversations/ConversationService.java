@@ -57,11 +57,13 @@ public class ConversationService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "CANNOT_MESSAGE_SELF", "Cannot start a conversation with yourself");
         }
 
+        // NEW LOGIC: Find existing conversation between these two participants (regardless of listing)
         ConversationEntity conv = conversationRepository
-                .findByListingIdAndInquirerUserIdAndPosterUserId(listingId, inquirerUserId, posterUserId)
+                .findByParticipants(inquirerUserId, posterUserId)
                 .orElseGet(() -> {
+                    // Create new conversation with the FIRST listing as context
                     ConversationEntity c = new ConversationEntity();
-                    c.setListingId(listingId);
+                    c.setListingId(listingId);  // Keep first listing for reference
                     c.setInquirerUserId(inquirerUserId);
                     c.setPosterUserId(posterUserId);
                     return conversationRepository.save(c);
@@ -69,8 +71,8 @@ public class ConversationService {
 
         return new ConversationResponse(
                 conv.getId(),
-                conv.getListingId(),
-                listing.getTitle(),
+                conv.getListingId(),  // Will show first listing that started the conversation
+                listing.getTitle(),   // Show current listing title in response
                 conv.getInquirerUserId(),
                 conv.getPosterUserId(),
                 conv.getCreatedAt(),

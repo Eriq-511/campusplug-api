@@ -35,6 +35,8 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
         Double getAlternateLat();
 
         Double getAlternateLng();
+
+        String getAvatarUrl();
     }
 
     @Query("select u from UserEntity u where lower(u.email) = lower(:email)")
@@ -53,7 +55,8 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
                             case when u.registered_geo is null then null else ST_X(u.registered_geo::geometry) end as registeredLng,
                             u.alternate_location_text as alternateLocationText,
                             case when u.alternate_geo is null then null else ST_Y(u.alternate_geo::geometry) end as alternateLat,
-                            case when u.alternate_geo is null then null else ST_X(u.alternate_geo::geometry) end as alternateLng
+                            case when u.alternate_geo is null then null else ST_X(u.alternate_geo::geometry) end as alternateLng,
+                            u.avatar_url as avatarUrl
             from users u
             where lower(u.email) = lower(:email)
             """, nativeQuery = true)
@@ -126,6 +129,13 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
            nativeQuery = true)
     int clearFcmToken(@Param("userId") Long userId);
 
+    // Avatar (profile picture)
+    @Transactional
+    @Modifying
+    @Query(value = "update users set avatar_url = :avatarUrl, avatar_public_id = :avatarPublicId, updated_at = now() where id = :userId",
+           nativeQuery = true)
+    int updateAvatar(@Param("userId") Long userId, @Param("avatarUrl") String avatarUrl, @Param("avatarPublicId") String avatarPublicId);
+
     // G4 — Find users near a point who have an FCM token (for push notifications)
     @Query(value = """
             select * from users
@@ -146,14 +156,16 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
         Long getId();
         String getFullName();
         String getCampus();
+        String getAvatarUrl();
         Instant getCreatedAt();
     }
 
     @Query(value = """
-            select u.id        as id,
-                   u.full_name as fullName,
-                   u.campus    as campus,
-                   u.created_at as createdAt
+            select u.id          as id,
+                   u.full_name   as fullName,
+                   u.campus      as campus,
+                   u.avatar_url  as avatarUrl,
+                   u.created_at  as createdAt
             from users u
             where u.id = :id
             """, nativeQuery = true)

@@ -19,6 +19,8 @@ import com.campusplug.api.uploads.cloudinary.dto.CloudinarySignatureRequest;
 import com.campusplug.api.uploads.cloudinary.dto.CloudinarySignatureResponse;
 import com.campusplug.api.users.UserRepository;
 
+import com.campusplug.api.uploads.cloudinary.dto.CloudinarySignatureRequest.UploadContext;
+
 @Service
 public class CloudinarySignatureService {
 
@@ -43,6 +45,17 @@ public class CloudinarySignatureService {
         UserRepository.UserProfileProjection user = userRepository.findProfileByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "User not found"));
 
+        UploadContext context = req.getUploadContext() != null ? req.getUploadContext() : UploadContext.LISTING;
+
+        if (context == UploadContext.AVATAR) {
+            return buildAvatarSignature(user.getId(), req);
+        }
+
+        // LISTING context — original logic
+        if (req.getListingId() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "MISSING_LISTING_ID", "listingId is required for LISTING uploads");
+        }
+
         ListingEntity listing = listingRepository.findById(req.getListingId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Listing not found"));
 
@@ -54,6 +67,24 @@ public class CloudinarySignatureService {
             throw new ApiException(HttpStatus.CONFLICT, "INVALID_STATE", "Listing must be ACTIVE");
         }
 
+        return buildSignature(req);
+    }
+
+    private CloudinarySignatureResponse buildAvatarSignature(Long userId, CloudinarySignatureRequest req) {
+        String avatarFolder = "campusplug/avatars/" + userId;
+        String avatarPublicId = avatarFolder + "/profile";
+
+        CloudinarySignatureRequest avatarRequest = new CloudinarySignatureRequest();
+        avatarRequest.setUploadContext(UploadContext.AVATAR);
+        avatarRequest.setFolder(avatarFolder);
+        avatarRequest.setPublicId(avatarPublicId);
+        avatarRequest.setOverwrite(Boolean.TRUE);
+        avatarRequest.setTimestamp(req.getTimestamp());
+
+        return buildSignature(avatarRequest);
+    }
+
+    private CloudinarySignatureResponse buildSignature(CloudinarySignatureRequest req) {
         Long requestedTimestamp = req.getTimestamp();
         long timestamp = Instant.now().getEpochSecond();
         if (requestedTimestamp != null) {

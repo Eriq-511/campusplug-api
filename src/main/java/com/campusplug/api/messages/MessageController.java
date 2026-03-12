@@ -28,7 +28,7 @@ public class MessageController {
             Authentication authentication,
             @PathVariable("conversationId") Long conversationId,
             @Valid @RequestBody SendMessageRequest request) {
-        return messageService.send(authentication.getName(), conversationId, request.body());
+        return messageService.send(authentication.getName(), conversationId, request.body(), request.referencedListingId());
     }
 
     @GetMapping("/long-poll")

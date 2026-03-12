@@ -1,1104 +1,1594 @@
 {
-  "info": {
-    "_postman_id": "8a2f1e2b-8f2b-4d3c-b2b2-0f3d9f25c3c1",
-    "name": "CampusPlug API",
-    "description": "CampusPlug local dev collection. Every state-change endpoint asserts status + actions in the response so the frontend can trust the values for button visibility.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "variable": [
-    { "key": "baseUrl", "value": "https://campusplug-api.onrender.com" },
-    { "key": "lat", "value": "-0.5950" },
-    { "key": "lng", "value": "30.5970" },
-    { "key": "zoneTag", "value": "kihumuro_main" },
-    { "key": "geoAddress", "value": "MUST%20Mbarara%2C%20Uganda" }
-  ],
-  "auth": {
-    "type": "bearer",
-    "bearer": [
-      { "key": "token", "value": "{{token}}", "type": "string" }
-    ]
-  },
-  "item": [
-    {
-      "name": "Health",
-      "item": [
-        {
-          "name": "Root",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "GET",
-            "url": "{{baseUrl}}/"
-          }
-        },
-        {
-          "name": "Actuator Health",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "GET",
-            "url": "{{baseUrl}}/actuator/health"
-          }
-        },
-        {
-          "name": "Actuator Info (requires JWT)",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/actuator/info"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Auth",
-      "item": [
-        {
-          "name": "Register Start (OTP-first)",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"{{registrationNumber}}\",\n  \"email\": \"{{email}}\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"registeredLocation\": {\n    \"label\": \"MUST Main Campus\",\n    \"lat\": -0.6089,\n    \"lng\": 30.6570\n  }\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/register/start"
-          }
-        },
-        {
-          "name": "Register Start (alternate location fallback)",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"{{registrationNumberAlt}}\",\n  \"email\": \"{{emailAlt}}\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  }\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/register/start"
-          }
-        },
-        {
-          "name": "Login (sets {{token}})",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('login returns 200', function () { pm.response.to.have.status(200); });",
-                  "const json = pm.response.json();",
-                  "pm.test('login returns JWT token (no OTP step)', function () {",
-                  "  pm.expect(json).to.have.property('token');",
-                  "  pm.expect(json.token).to.be.a('string').and.not.empty;",
-                  "});",
-                  "pm.test('login is not OTP pending', function () {",
-                  "  pm.expect(json.status).to.not.eql('OTP_SENT');",
-                  "});",
-                  "if (json && json.token) { pm.environment.set('token', json.token); }",
-                  "if (json && json.user && json.user.email) { pm.environment.set('email', json.user.email); }",
-                  "if (json && json.user && json.user.id) { pm.environment.set('publicUserId', json.user.id); }",
-                  "if (json && json.status === 'OTP_SENT') {",
-                  "  throw new Error('Server is still running old login OTP flow. Restart/rebuild backend so /api/v1/auth/login returns token directly.');",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/login"
-          }
-        },
-        {
-          "name": "Register Verify OTP",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otpCode}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/register/verify-otp"
-          }
-        },
-        {
-          "name": "Register Set Password (sets {{token}})",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (json && json.token) { pm.environment.set('token', json.token); }",
-                  "if (json && json.user && json.user.email) { pm.environment.set('email', json.user.email); }",
-                  "if (json && json.user && json.user.id) { pm.environment.set('publicUserId', json.user.id); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/register/set-password"
-          }
-        },
-        {
-          "name": "Logout",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/auth/logout"
-          }
-        },
-        {
-          "name": "Forgot Password",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (json && json.devOtp) { pm.environment.set('otpCode', json.devOtp); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{email}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/forgot-password"
-          }
-        },
-        {
-          "name": "Reset Password",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otpCode}}\",\n  \"password\": \"{{newPassword}}\",\n  \"confirmPassword\": \"{{newPassword}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/reset-password"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Users",
-      "item": [
-        {
-          "name": "Get Profile",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/users/profile"
-          }
-        },
-        {
-          "name": "Update Profile (registered location)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"campus\": \"main\",\n  \"phoneNumber\": \"+256700000000\",\n  \"registeredLocation\": {\n    \"label\": \"Library\",\n    \"lat\": 0.329,\n    \"lng\": 32.571\n  }\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/users/profile"
-          }
-        }
-        ,
-        {
-          "name": "Update Profile (alternate location fallback)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  }\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/users/profile"
-          }
-        },
-        {
-          "name": "Get Public Profile",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/users/{{publicUserId}}/public"
-          }
-        },
-        {
-          "name": "Update Last Location",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"lat\": {{lat}},\n  \"lng\": {{lng}}\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/users/location"
-          }
-        },
-        {
-          "name": "Update FCM Token",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"token\": \"demo-fcm-token\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/users/fcm-token"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Categories",
-      "item": [
-        {
-          "name": "List Categories",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/categories"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Listings",
-      "description": "Listing CRUD + state actions. Every state-change request has a test script that asserts the returned status and actions flags.",
-      "item": [
-        {
-          "name": "Create Listing (sets {{listingId}})",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "if (j && j.id) { pm.environment.set('listingId', j.id); }",
-                  "pm.test('status is ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
-                  "pm.test('actions.canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);",
-                  "pm.test('actions.canMarkSold true', () => pm.expect(j.actions.canMarkSold).to.be.true);",
-                  "pm.test('actions.canDelete true', () => pm.expect(j.actions.canDelete).to.be.true);",
-                  "pm.test('actions.canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
-                  "pm.test('actions.canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Laptop\",\n  \"priceUgx\": 1000000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Good condition\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/listings"
-          }
-        },
-        {
-          "name": "My Listings — All",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/my?status=ALL"
-          }
-        },
-        {
-          "name": "My Listings — Active",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/my?status=ACTIVE"
-          }
-        },
-        {
-          "name": "My Listings — Sold",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/my?status=SOLD"
-          }
-        },
-        {
-          "name": "My Listings — Deleted",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/my?status=DELETED"
-          }
-        },
-        {
-          "name": "Update Listing",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('status still ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
-                  "pm.test('actions.canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Updated title\",\n  \"priceUgx\": 1200000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Updated description\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}"
-          }
-        },
-        {
-          "name": "Attach Listing Image",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const j = pm.response.json();",
-                  "if (j && j.images && j.images.length > 0) {",
-                  "  const last = j.images[j.images.length - 1];",
-                  "  pm.environment.set('imageId', last.id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"publicId\": \"example-public-id\",\n  \"secureUrl\": \"https://res.cloudinary.com/demo/image/upload/example-public-id.jpg\",\n  \"width\": 800,\n  \"height\": 600,\n  \"bytes\": 12345,\n  \"format\": \"jpg\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/images"
-          }
-        },
-        {
-          "name": "Remove Listing Image",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "DELETE",
-            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/images/{{imageId}}"
-          }
-        },
-        {
-          "name": "Mark Listing SOLD",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('status is SOLD', () => pm.expect(j.status).to.eql('SOLD'));",
-                  "pm.test('actions.canEdit false (SOLD = terminal)', () => pm.expect(j.actions.canEdit).to.be.false);",
-                  "pm.test('actions.canMarkSold false', () => pm.expect(j.actions.canMarkSold).to.be.false);",
-                  "pm.test('actions.canDelete false', () => pm.expect(j.actions.canDelete).to.be.false);",
-                  "pm.test('actions.canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
-                  "pm.test('actions.canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/sold"
-          }
-        },
-        {
-          "name": "Soft Delete Listing",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('status is DELETED', () => pm.expect(j.status).to.eql('DELETED'));",
-                  "pm.test('actions.canEdit false', () => pm.expect(j.actions.canEdit).to.be.false);",
-                  "pm.test('actions.canMarkSold false', () => pm.expect(j.actions.canMarkSold).to.be.false);",
-                  "pm.test('actions.canDelete false', () => pm.expect(j.actions.canDelete).to.be.false);",
-                  "pm.test('actions.canRestore true', () => pm.expect(j.actions.canRestore).to.be.true);",
-                  "pm.test('actions.canPurge true', () => pm.expect(j.actions.canPurge).to.be.true);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/delete"
-          }
-        },
-        {
-          "name": "Restore Listing",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('status is ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
-                  "pm.test('actions.canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);",
-                  "pm.test('actions.canMarkSold true', () => pm.expect(j.actions.canMarkSold).to.be.true);",
-                  "pm.test('actions.canDelete true', () => pm.expect(j.actions.canDelete).to.be.true);",
-                  "pm.test('actions.canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
-                  "pm.test('actions.canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/restore"
-          }
-        },
-        {
-          "name": "Purge Listing (hard delete — must be DELETED first)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('purge message present', () => pm.expect(j.message).to.eql('Purged'));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{listingId}}/purge"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Listing Lifecycle (state machine demo)",
-      "description": "Runs the full state machine in order. Uses {{token}} so log in first. Each step asserts status + actions in the response.",
-      "item": [
-        {
-          "name": "LC1 — Create (→ ACTIVE)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "if (j && j.id) { pm.environment.set('lcListingId', j.id); }",
-                  "pm.test('status ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
-                  "pm.test('canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);",
-                  "pm.test('canMarkSold true', () => pm.expect(j.actions.canMarkSold).to.be.true);",
-                  "pm.test('canDelete true', () => pm.expect(j.actions.canDelete).to.be.true);",
-                  "pm.test('canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
-                  "pm.test('canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"LC Test Item\",\n  \"priceUgx\": 50000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Lifecycle demo\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/listings"
-          }
-        },
-        {
-          "name": "LC2 — Delete (ACTIVE → DELETED)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('status DELETED', () => pm.expect(j.status).to.eql('DELETED'));",
-                  "pm.test('canEdit false', () => pm.expect(j.actions.canEdit).to.be.false);",
-                  "pm.test('canDelete false', () => pm.expect(j.actions.canDelete).to.be.false);",
-                  "pm.test('canRestore true', () => pm.expect(j.actions.canRestore).to.be.true);",
-                  "pm.test('canPurge true', () => pm.expect(j.actions.canPurge).to.be.true);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId}}/delete"
-          }
-        },
-        {
-          "name": "LC3 — Restore (DELETED → ACTIVE)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('status ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));",
-                  "pm.test('canEdit true', () => pm.expect(j.actions.canEdit).to.be.true);",
-                  "pm.test('canDelete true', () => pm.expect(j.actions.canDelete).to.be.true);",
-                  "pm.test('canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
-                  "pm.test('canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId}}/restore"
-          }
-        },
-        {
-          "name": "LC4 — Mark SOLD (ACTIVE → SOLD)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('status SOLD', () => pm.expect(j.status).to.eql('SOLD'));",
-                  "pm.test('canEdit false (terminal)', () => pm.expect(j.actions.canEdit).to.be.false);",
-                  "pm.test('canMarkSold false', () => pm.expect(j.actions.canMarkSold).to.be.false);",
-                  "pm.test('canDelete false', () => pm.expect(j.actions.canDelete).to.be.false);",
-                  "pm.test('canRestore false', () => pm.expect(j.actions.canRestore).to.be.false);",
-                  "pm.test('canPurge false', () => pm.expect(j.actions.canPurge).to.be.false);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId}}/sold"
-          }
-        },
-        {
-          "name": "LC5 — Create second listing for purge path",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const j = pm.response.json();",
-                  "if (j && j.id) { pm.environment.set('lcListingId2', j.id); }",
-                  "pm.test('status ACTIVE', () => pm.expect(j.status).to.eql('ACTIVE'));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"LC Purge Test Item\",\n  \"priceUgx\": 10000,\n  \"categoryCode\": \"BOOKS\",\n  \"description\": \"Will be purged\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/listings"
-          }
-        },
-        {
-          "name": "LC6 — Delete second listing (ACTIVE → DELETED)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const j = pm.response.json();",
-                  "pm.test('status DELETED', () => pm.expect(j.status).to.eql('DELETED'));",
-                  "pm.test('canPurge true', () => pm.expect(j.actions.canPurge).to.be.true);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId2}}/delete"
-          }
-        },
-        {
-          "name": "LC7 — Purge (DELETED → gone, 204)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('purge message present', () => pm.expect(j.message).to.eql('Purged'));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/v1/listings/{{lcListingId2}}/purge"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Browse",
-      "item": [
-        {
-          "name": "Search Listings",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/search?query=laptop&page=0&size=20"
-          }
-        },
-        {
-          "name": "Nearby Listings",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/nearby?lat=0.329&lng=32.571&radiusKm=5&page=0&size=20"
-          }
-        },
-        {
-          "name": "Zone Listings",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/zone/{{zoneTag}}?lat={{lat}}&lng={{lng}}&page=0&size=20"
-          }
-        },
-        {
-          "name": "Zone Listing Count",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/zone/{{zoneTag}}/count"
-          }
-        },
-        {
-          "name": "Feed By Distance",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/listings/feed?lat={{lat}}&lng={{lng}}&page=0&size=20"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Geo",
-      "item": [
-        {
-          "name": "Forward Geocode",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/geo/geocode?address={{geoAddress}}"
-          }
-        },
-        {
-          "name": "Reverse Geocode",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/geo/reverse?lat={{lat}}&lng={{lng}}"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Zones",
-      "item": [
-        {
-          "name": "List Zones",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/zones"
-          }
-        },
-        {
-          "name": "Check Current Location Zone",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"lat\": {{lat}},\n  \"lng\": {{lng}}\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/location/check"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Bookmarks",
-      "item": [
-        {
-          "name": "Add Bookmark",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"listingId\": {{listingId}}\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/bookmarks"
-          }
-        },
-        {
-          "name": "List Bookmarks",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/bookmarks?page=0&size=20"
-          }
-        },
-        {
-          "name": "Remove Bookmark",
-          "request": {
-            "method": "DELETE",
-            "url": "{{baseUrl}}/api/v1/bookmarks?listingId={{listingId}}"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Conversations",
-      "item": [
-        {
-          "name": "Create/Get Conversation (sets {{conversationId}})",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (json && json.id) { pm.environment.set('conversationId', json.id); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"listingId\": {{listingId}}\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/conversations"
-          }
-        },
-        {
-          "name": "List Conversations",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/conversations?page=0&size=20"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Messages",
-      "item": [
-        {
-          "name": "Send Message (sets {{messageId}})",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (json && json.id) { pm.environment.set('messageId', json.id); }"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"body\": \"Hello from Postman\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
-          }
-        },
-        {
-          "name": "Latest Messages",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages?limit=50"
-          }
-        },
-        {
-          "name": "Long Poll Messages",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages/long-poll?afterMessageId={{messageId}}&timeoutSeconds=25"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Conversation Flow (2-user OTP demo)",
-      "description": "Step-by-step with OTP-first registration for both users. Run in order and set sellerOtpCode/buyerOtpCode from email before verify steps.",
-      "item": [
-        {
-          "name": "Step 1 — Register Start Poster",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Alice Seller\",\n  \"registrationNumber\": \"{{sellerRegistrationNumber}}\",\n  \"email\": \"{{sellerEmail}}\",\n  \"phoneNumber\": \"+256700000001\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 }\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/register/start"
-          }
-        },
-        {
-          "name": "Step 2 — Verify OTP Poster",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{sellerEmail}}\",\n  \"otp\": \"{{sellerOtpCode}}\"\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/register/verify-otp"
-          }
-        },
-        {
-          "name": "Step 3 — Set Password Poster (sets sellerToken)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": ["const j = pm.response.json(); if (j && j.token) { pm.environment.set('sellerToken', j.token); pm.environment.set('token', j.token); }"],
-              "type": "text/javascript"
-            }
-          }],
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{sellerEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}" },
-            "url": "{{baseUrl}}/api/v1/auth/register/set-password"
-          }
-        },
-        {
-          "name": "Step 4 — Register Start Inquirer",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Bob Buyer\",\n  \"registrationNumber\": \"{{buyerRegistrationNumber}}\",\n  \"email\": \"{{buyerEmail}}\",\n  \"phoneNumber\": \"+256700000002\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 }\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/auth/register/start"
-          }
-        },
-        {
-          "name": "Step 5 — Verify OTP Inquirer",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{buyerEmail}}\",\n  \"otp\": \"{{buyerOtpCode}}\"\n}" },
-            "url": "{{baseUrl}}/api/v1/auth/register/verify-otp"
-          }
-        },
-        {
-          "name": "Step 6 — Set Password Inquirer (sets buyerToken)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": ["const j = pm.response.json(); if (j && j.token) { pm.environment.set('buyerToken', j.token); pm.environment.set('token', j.token); }"],
-              "type": "text/javascript"
-            }
-          }],
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{buyerEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}" },
-            "url": "{{baseUrl}}/api/v1/auth/register/set-password"
-          }
-        },
-        {
-          "name": "Step 7 — Create Listing as Poster (sets listingId)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": ["const j = pm.response.json(); if (j && j.id) { pm.environment.set('listingId', j.id); }"],
-              "type": "text/javascript"
-            }
-          }],
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{\n  \"title\": \"MacBook Pro 2021\",\n  \"priceUgx\": 4500000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Great condition, barely used\"\n}" },
-            "url": "{{baseUrl}}/api/v1/listings"
-          }
-        },
-        {
-          "name": "Step 8 — Inquirer starts Conversation (sets conversationId)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": ["const j = pm.response.json(); if (j && j.id) { pm.environment.set('conversationId', j.id); }"],
-              "type": "text/javascript"
-            }
-          }],
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{buyerToken}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{\n  \"listingId\": {{listingId}}\n}" },
-            "url": "{{baseUrl}}/api/v1/conversations"
-          }
-        },
-        {
-          "name": "Step 9 — Inquirer sends Message (sets messageId)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": ["const j = pm.response.json(); if (j && j.id) { pm.environment.set('messageId', j.id); }"],
-              "type": "text/javascript"
-            }
-          }],
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{buyerToken}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{\n  \"body\": \"Hi, is this still available?\"\n}" },
-            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
-          }
-        },
-        {
-          "name": "Step 10 — Poster replies",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{\n  \"body\": \"Yes, still available! When can you come?\"\n}" },
-            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
-          }
-        },
-        {
-          "name": "Step 11 — Poster reads messages",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
-            "url": "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages?limit=50"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Uploads",
-      "item": [
-        {
-          "name": "Cloudinary Signature",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"listingId\": {{listingId}},\n  \"folder\": \"campusplug/listings/{{listingId}}\",\n  \"publicId\": \"{{listingId}}-main\",\n  \"overwrite\": false\n}"
-            },
-            "url": "{{baseUrl}}/api/v1/uploads/cloudinary/signature"
-          }
-        }
-      ]
-    }
-  ]
+    "info":  {
+                 "_postman_id":  "8a2f1e2b-8f2b-4d3c-b2b2-0f3d9f25c3c1",
+                 "name":  "CampusPlug API",
+                 "description":  "CampusPlug local dev collection. Every state-change endpoint asserts status + actions in the response so the frontend can trust the values for button visibility.",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "https://campusplug-api.onrender.com"
+                     },
+                     {
+                         "key":  "lat",
+                         "value":  "-0.5950"
+                     },
+                     {
+                         "key":  "lng",
+                         "value":  "30.5970"
+                     },
+                     {
+                         "key":  "zoneTag",
+                         "value":  "kihumuro_main"
+                     },
+                     {
+                         "key":  "geoAddress",
+                         "value":  "MUST%20Mbarara%2C%20Uganda"
+                     }
+                 ],
+    "auth":  {
+                 "type":  "bearer",
+                 "bearer":  [
+                                {
+                                    "key":  "token",
+                                    "value":  "{{token}}",
+                                    "type":  "string"
+                                }
+                            ]
+             },
+    "item":  [
+                 {
+                     "name":  "Health",
+                     "item":  [
+                                  {
+                                      "name":  "Root",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Actuator Health",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/actuator/health"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Actuator Info (requires JWT)",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/actuator/info"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Auth",
+                     "item":  [
+                                  {
+                                      "name":  "Register Start (OTP-first)",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"{{registrationNumber}}\",\n  \"email\": \"{{email}}\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"registeredLocation\": {\n    \"label\": \"MUST Main Campus\",\n    \"lat\": -0.6089,\n    \"lng\": 30.6570\n  }\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/start"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Register Start (alternate location fallback)",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"fullName\": \"Test User\",\n  \"registrationNumber\": \"{{registrationNumberAlt}}\",\n  \"email\": \"{{emailAlt}}\",\n  \"phoneNumber\": \"+256700000000\",\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  }\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/start"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Login (sets {{token}})",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027login returns 200\u0027, function () { pm.response.to.have.status(200); });",
+                                                                                    "const json = pm.response.json();",
+                                                                                    "pm.test(\u0027login returns JWT token (no OTP step)\u0027, function () {",
+                                                                                    "  pm.expect(json).to.have.property(\u0027token\u0027);",
+                                                                                    "  pm.expect(json.token).to.be.a(\u0027string\u0027).and.not.empty;",
+                                                                                    "});",
+                                                                                    "pm.test(\u0027login is not OTP pending\u0027, function () {",
+                                                                                    "  pm.expect(json.status).to.not.eql(\u0027OTP_SENT\u0027);",
+                                                                                    "});",
+                                                                                    "if (json \u0026\u0026 json.token) { pm.environment.set(\u0027token\u0027, json.token); }",
+                                                                                    "if (json \u0026\u0026 json.user \u0026\u0026 json.user.email) { pm.environment.set(\u0027email\u0027, json.user.email); }",
+                                                                                    "if (json \u0026\u0026 json.user \u0026\u0026 json.user.id) { pm.environment.set(\u0027publicUserId\u0027, json.user.id); }",
+                                                                                    "if (json \u0026\u0026 json.status === \u0027OTP_SENT\u0027) {",
+                                                                                    "  throw new Error(\u0027Server is still running old login OTP flow. Restart/rebuild backend so /api/v1/auth/login returns token directly.\u0027);",
+                                                                                    "}"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/login"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Register Verify OTP",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otpCode}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/verify-otp"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Register Set Password (sets {{token}})",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const json = pm.response.json();",
+                                                                                    "if (json \u0026\u0026 json.token) { pm.environment.set(\u0027token\u0027, json.token); }",
+                                                                                    "if (json \u0026\u0026 json.user \u0026\u0026 json.user.email) { pm.environment.set(\u0027email\u0027, json.user.email); }",
+                                                                                    "if (json \u0026\u0026 json.user \u0026\u0026 json.user.id) { pm.environment.set(\u0027publicUserId\u0027, json.user.id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/set-password"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Logout",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/auth/logout"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Forgot Password",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const json = pm.response.json();",
+                                                                                    "if (json \u0026\u0026 json.devOtp) { pm.environment.set(\u0027otpCode\u0027, json.devOtp); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{email}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/forgot-password"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Reset Password",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otpCode}}\",\n  \"password\": \"{{newPassword}}\",\n  \"confirmPassword\": \"{{newPassword}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/reset-password"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Users",
+                     "item":  [
+                                  {
+                                      "name":  "Get Profile",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/users/profile"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Update Profile (registered location)",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"campus\": \"main\",\n  \"phoneNumber\": \"+256700000000\",\n  \"registeredLocation\": {\n    \"label\": \"Library\",\n    \"lat\": 0.329,\n    \"lng\": 32.571\n  }\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/users/profile"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Update Profile (alternate location fallback)",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"campus\": \"main\",\n  \"alternateLocation\": {\n    \"label\": \"Cafe Havana\",\n    \"lat\": 0.3300,\n    \"lng\": 32.5720\n  }\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/users/profile"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Get Public Profile",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/users/{{publicUserId}}/public"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Update Last Location",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"lat\": {{lat}},\n  \"lng\": {{lng}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/users/location"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Update FCM Token",
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"token\": \"demo-fcm-token\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/users/fcm-token"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Update Avatar — Confirm Upload",
+                                      "description":  "Step 3 of the avatar flow. After uploading to Cloudinary, confirm the upload so the server validates and persists the new avatar URL. avatarPublicId must match campusplug/avatars/{userId}/profile.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027avatarUrl present in response\u0027, () =\u003e pm.expect(j.avatarUrl).to.be.a(\u0027string\u0027).and.not.empty);",
+                                                                                    "if (j \u0026\u0026 j.avatarUrl) { pm.environment.set(\u0027avatarUrl\u0027, j.avatarUrl); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"avatarUrl\": \"{{avatarUrl}}\",\n  \"avatarPublicId\": \"{{avatarPublicId}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/users/profile/avatar"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Categories",
+                     "item":  [
+                                  {
+                                      "name":  "List Categories",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/categories"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Listings",
+                     "description":  "Listing CRUD + state actions. Every state-change request has a test script that asserts the returned status and actions flags.",
+                     "item":  [
+                                  {
+                                      "name":  "Create Listing (sets {{listingId}})",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "if (j \u0026\u0026 j.id) { pm.environment.set(\u0027listingId\u0027, j.id); }",
+                                                                                    "pm.test(\u0027status is ACTIVE\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027ACTIVE\u0027));",
+                                                                                    "pm.test(\u0027actions.canEdit true\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.true);",
+                                                                                    "pm.test(\u0027actions.canMarkSold true\u0027, () =\u003e pm.expect(j.actions.canMarkSold).to.be.true);",
+                                                                                    "pm.test(\u0027actions.canDelete true\u0027, () =\u003e pm.expect(j.actions.canDelete).to.be.true);",
+                                                                                    "pm.test(\u0027actions.canRestore false\u0027, () =\u003e pm.expect(j.actions.canRestore).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canPurge false\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.false);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"title\": \"Laptop\",\n  \"priceUgx\": 1000000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Good condition\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/listings"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "My Listings — All",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/my?status=ALL"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "My Listings — Active",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/my?status=ACTIVE"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "My Listings — Sold",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/my?status=SOLD"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "My Listings — Deleted",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/my?status=DELETED"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Update Listing",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027status still ACTIVE\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027ACTIVE\u0027));",
+                                                                                    "pm.test(\u0027actions.canEdit true\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.true);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "PUT",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"title\": \"Updated title\",\n  \"priceUgx\": 1200000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Updated description\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{listingId}}"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Attach Listing Image",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json();",
+                                                                                    "if (j \u0026\u0026 j.images \u0026\u0026 j.images.length \u003e 0) {",
+                                                                                    "  const last = j.images[j.images.length - 1];",
+                                                                                    "  pm.environment.set(\u0027imageId\u0027, last.id);",
+                                                                                    "}"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"publicId\": \"example-public-id\",\n  \"secureUrl\": \"https://res.cloudinary.com/demo/image/upload/example-public-id.jpg\",\n  \"width\": 800,\n  \"height\": 600,\n  \"bytes\": 12345,\n  \"format\": \"jpg\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{listingId}}/images"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Remove Listing Image",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{listingId}}/images/{{imageId}}"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Mark Listing SOLD",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027status is SOLD\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027SOLD\u0027));",
+                                                                                    "pm.test(\u0027actions.canEdit false (SOLD = terminal)\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canMarkSold false\u0027, () =\u003e pm.expect(j.actions.canMarkSold).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canDelete false\u0027, () =\u003e pm.expect(j.actions.canDelete).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canRestore false\u0027, () =\u003e pm.expect(j.actions.canRestore).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canPurge false\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.false);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{listingId}}/sold"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Soft Delete Listing",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027status is DELETED\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027DELETED\u0027));",
+                                                                                    "pm.test(\u0027actions.canEdit false\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canMarkSold false\u0027, () =\u003e pm.expect(j.actions.canMarkSold).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canDelete false\u0027, () =\u003e pm.expect(j.actions.canDelete).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canRestore true\u0027, () =\u003e pm.expect(j.actions.canRestore).to.be.true);",
+                                                                                    "pm.test(\u0027actions.canPurge true\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.true);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{listingId}}/delete"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Restore Listing",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027status is ACTIVE\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027ACTIVE\u0027));",
+                                                                                    "pm.test(\u0027actions.canEdit true\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.true);",
+                                                                                    "pm.test(\u0027actions.canMarkSold true\u0027, () =\u003e pm.expect(j.actions.canMarkSold).to.be.true);",
+                                                                                    "pm.test(\u0027actions.canDelete true\u0027, () =\u003e pm.expect(j.actions.canDelete).to.be.true);",
+                                                                                    "pm.test(\u0027actions.canRestore false\u0027, () =\u003e pm.expect(j.actions.canRestore).to.be.false);",
+                                                                                    "pm.test(\u0027actions.canPurge false\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.false);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{listingId}}/restore"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Purge Listing (hard delete — must be DELETED first)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027purge message present\u0027, () =\u003e pm.expect(j.message).to.eql(\u0027Purged\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{listingId}}/purge"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Listing Lifecycle (state machine demo)",
+                     "description":  "Runs the full state machine in order. Uses {{token}} so log in first. Each step asserts status + actions in the response.",
+                     "item":  [
+                                  {
+                                      "name":  "LC1 — Create (→ ACTIVE)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "if (j \u0026\u0026 j.id) { pm.environment.set(\u0027lcListingId\u0027, j.id); }",
+                                                                                    "pm.test(\u0027status ACTIVE\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027ACTIVE\u0027));",
+                                                                                    "pm.test(\u0027canEdit true\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.true);",
+                                                                                    "pm.test(\u0027canMarkSold true\u0027, () =\u003e pm.expect(j.actions.canMarkSold).to.be.true);",
+                                                                                    "pm.test(\u0027canDelete true\u0027, () =\u003e pm.expect(j.actions.canDelete).to.be.true);",
+                                                                                    "pm.test(\u0027canRestore false\u0027, () =\u003e pm.expect(j.actions.canRestore).to.be.false);",
+                                                                                    "pm.test(\u0027canPurge false\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.false);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"title\": \"LC Test Item\",\n  \"priceUgx\": 50000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Lifecycle demo\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/listings"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "LC2 — Delete (ACTIVE → DELETED)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027status DELETED\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027DELETED\u0027));",
+                                                                                    "pm.test(\u0027canEdit false\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.false);",
+                                                                                    "pm.test(\u0027canDelete false\u0027, () =\u003e pm.expect(j.actions.canDelete).to.be.false);",
+                                                                                    "pm.test(\u0027canRestore true\u0027, () =\u003e pm.expect(j.actions.canRestore).to.be.true);",
+                                                                                    "pm.test(\u0027canPurge true\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.true);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{lcListingId}}/delete"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "LC3 — Restore (DELETED → ACTIVE)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027status ACTIVE\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027ACTIVE\u0027));",
+                                                                                    "pm.test(\u0027canEdit true\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.true);",
+                                                                                    "pm.test(\u0027canDelete true\u0027, () =\u003e pm.expect(j.actions.canDelete).to.be.true);",
+                                                                                    "pm.test(\u0027canRestore false\u0027, () =\u003e pm.expect(j.actions.canRestore).to.be.false);",
+                                                                                    "pm.test(\u0027canPurge false\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.false);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{lcListingId}}/restore"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "LC4 — Mark SOLD (ACTIVE → SOLD)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027status SOLD\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027SOLD\u0027));",
+                                                                                    "pm.test(\u0027canEdit false (terminal)\u0027, () =\u003e pm.expect(j.actions.canEdit).to.be.false);",
+                                                                                    "pm.test(\u0027canMarkSold false\u0027, () =\u003e pm.expect(j.actions.canMarkSold).to.be.false);",
+                                                                                    "pm.test(\u0027canDelete false\u0027, () =\u003e pm.expect(j.actions.canDelete).to.be.false);",
+                                                                                    "pm.test(\u0027canRestore false\u0027, () =\u003e pm.expect(j.actions.canRestore).to.be.false);",
+                                                                                    "pm.test(\u0027canPurge false\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.false);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{lcListingId}}/sold"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "LC5 — Create second listing for purge path",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json();",
+                                                                                    "if (j \u0026\u0026 j.id) { pm.environment.set(\u0027lcListingId2\u0027, j.id); }",
+                                                                                    "pm.test(\u0027status ACTIVE\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027ACTIVE\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"title\": \"LC Purge Test Item\",\n  \"priceUgx\": 10000,\n  \"categoryCode\": \"BOOKS\",\n  \"description\": \"Will be purged\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/listings"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "LC6 — Delete second listing (ACTIVE → DELETED)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027status DELETED\u0027, () =\u003e pm.expect(j.status).to.eql(\u0027DELETED\u0027));",
+                                                                                    "pm.test(\u0027canPurge true\u0027, () =\u003e pm.expect(j.actions.canPurge).to.be.true);"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{lcListingId2}}/delete"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "LC7 — Purge (DELETED → gone, 204)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027purge message present\u0027, () =\u003e pm.expect(j.message).to.eql(\u0027Purged\u0027));"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/{{lcListingId2}}/purge"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Browse",
+                     "item":  [
+                                  {
+                                      "name":  "Search Listings",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/search?query=laptop\u0026page=0\u0026size=20"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Nearby Listings",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/nearby?lat=0.329\u0026lng=32.571\u0026radiusKm=5\u0026page=0\u0026size=20"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Zone Listings",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/zone/{{zoneTag}}?lat={{lat}}\u0026lng={{lng}}\u0026page=0\u0026size=20"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Zone Listing Count",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/zone/{{zoneTag}}/count"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Feed By Distance",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/listings/feed?lat={{lat}}\u0026lng={{lng}}\u0026page=0\u0026size=20"
+                                                  }
+                                  },
+                                  {
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  {
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "raw":  "{{base_url}}/listings/{{listingId}}",
+                                                                  "path":  [
+                                                                               "listings",
+                                                                               "{{listingId}}"
+                                                                           ]
+                                                              },
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "type":  "text",
+                                                                         "value":  "Bearer {{token}}"
+                                                                     }
+                                                                 ]
+                                                  },
+                                      "name":  "Get Listing Detail",
+                                      "response":  [
+
+                                                   ]
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Geo",
+                     "item":  [
+                                  {
+                                      "name":  "Forward Geocode",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/geo/geocode?address={{geoAddress}}"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Reverse Geocode",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/geo/reverse?lat={{lat}}\u0026lng={{lng}}"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Zones",
+                     "item":  [
+                                  {
+                                      "name":  "List Zones",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/zones"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Check Current Location Zone",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"lat\": {{lat}},\n  \"lng\": {{lng}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/location/check"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Bookmarks",
+                     "item":  [
+                                  {
+                                      "name":  "Add Bookmark",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"listingId\": {{listingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/bookmarks"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "List Bookmarks",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/bookmarks?page=0\u0026size=20"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Remove Bookmark",
+                                      "request":  {
+                                                      "method":  "DELETE",
+                                                      "url":  "{{baseUrl}}/api/v1/bookmarks?listingId={{listingId}}"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Conversations",
+                     "item":  [
+                                  {
+                                      "name":  "Create/Get Conversation (sets {{conversationId}})",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const json = pm.response.json();",
+                                                                                    "if (json \u0026\u0026 json.id) { pm.environment.set(\u0027conversationId\u0027, json.id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"listingId\": {{listingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/conversations"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "List Conversations",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/conversations?page=0\u0026size=20"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Messages",
+                     "item":  [
+                                  {
+                                      "name":  "Send Message (sets {{messageId}})",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const json = pm.response.json();",
+                                                                                    "if (json \u0026\u0026 json.id) { pm.environment.set(\u0027messageId\u0027, json.id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"body\": \"Hello from Postman\",\n  \"referencedListingId\": {{listingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Latest Messages",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages?limit=50"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Long Poll Messages",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages/long-poll?afterMessageId={{messageId}}\u0026timeoutSeconds=25"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Send Message with Product Reference",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const json = pm.response.json();",
+                                                                                    "if (json \u0026\u0026 json.id) { pm.environment.set(\u0027messageId\u0027, json.id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"body\": \"Also interested in your other products!\",\n  \"referencedListingId\": {{secondListingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Conversation Flow (2-user OTP demo)",
+                     "description":  "Complete 2-user workflow with unified conversations demo. Shows how users have ONE conversation thread regardless of products discussed. Steps 12-15 demonstrate the unified behavior: second listing creation, same conversation returned, messages with referencedListingId. Run in order and set sellerOtpCode/buyerOtpCode from email before verify steps.",
+                     "item":  [
+                                  {
+                                      "name":  "Step 1 — Register Start Poster",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"fullName\": \"Alice Seller\",\n  \"registrationNumber\": \"{{sellerRegistrationNumber}}\",\n  \"email\": \"{{sellerEmail}}\",\n  \"phoneNumber\": \"+256700000001\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 }\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/start"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 2 — Verify OTP Poster",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{sellerEmail}}\",\n  \"otp\": \"{{sellerOtpCode}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/verify-otp"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 3 — Set Password Poster (sets sellerToken)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json(); if (j \u0026\u0026 j.token) { pm.environment.set(\u0027sellerToken\u0027, j.token); pm.environment.set(\u0027token\u0027, j.token); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{sellerEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/set-password"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 4 — Register Start Inquirer",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"fullName\": \"Bob Buyer\",\n  \"registrationNumber\": \"{{buyerRegistrationNumber}}\",\n  \"email\": \"{{buyerEmail}}\",\n  \"phoneNumber\": \"+256700000002\",\n  \"campus\": \"main\",\n  \"registeredLocation\": { \"label\": \"MUST Main Campus\", \"lat\": -0.6089, \"lng\": 30.6570 }\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/start"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 5 — Verify OTP Inquirer",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{buyerEmail}}\",\n  \"otp\": \"{{buyerOtpCode}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/verify-otp"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 6 — Set Password Inquirer (sets buyerToken)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json(); if (j \u0026\u0026 j.token) { pm.environment.set(\u0027buyerToken\u0027, j.token); pm.environment.set(\u0027token\u0027, j.token); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"email\": \"{{buyerEmail}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/auth/register/set-password"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 7 — Create Listing as Poster (sets listingId)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json(); if (j \u0026\u0026 j.id) { pm.environment.set(\u0027listingId\u0027, j.id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"title\": \"MacBook Pro 2021\",\n  \"priceUgx\": 4500000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Great condition, barely used\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/listings"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 8 — Inquirer starts Conversation (sets conversationId)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json(); if (j \u0026\u0026 j.id) { pm.environment.set(\u0027conversationId\u0027, j.id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{buyerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"listingId\": {{listingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/conversations"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 9 — Inquirer sends Message (sets messageId)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json(); if (j \u0026\u0026 j.id) { pm.environment.set(\u0027messageId\u0027, j.id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{buyerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"body\": \"Hi, is this still available?\",\n  \"referencedListingId\": {{listingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 10 — Poster replies",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"body\": \"Yes, still available! When can you come?\",\n  \"referencedListingId\": {{listingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 11 — Poster reads messages",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages?limit=50"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 12 — Create Second Listing (sets secondListingId)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json(); if (j \u0026\u0026 j.id) { pm.environment.set(\u0027secondListingId\u0027, j.id); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"title\": \"iPhone 13 Pro\",\n  \"priceUgx\": 2800000,\n  \"categoryCode\": \"ELECTRONICS\",\n  \"description\": \"Excellent condition, includes box and charger\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/listings"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 13 — Try to Create New Conversation for iPhone (same conversationId returned!)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027Same conversation ID returned\u0027, () =\u003e {",
+                                                                                    "  const currentConvId = pm.environment.get(\u0027conversationId\u0027);",
+                                                                                    "  pm.expect(j.id.toString()).to.eql(currentConvId);",
+                                                                                    "});",
+                                                                                    "pm.test(\u0027Original listing ID preserved\u0027, () =\u003e {",
+                                                                                    "  const originalListingId = pm.environment.get(\u0027listingId\u0027);",
+                                                                                    "  pm.expect(j.listingId.toString()).to.eql(originalListingId);",
+                                                                                    "});"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{buyerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"listingId\": {{secondListingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/conversations"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 14 — Send Message about iPhone (same conversation!)",
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     },
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{buyerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"body\": \"Also interested in the iPhone 13 Pro. Bundle deal possible?\",\n  \"referencedListingId\": {{secondListingId}}\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Step 15 — View Unified Conversation (shows both MacBook and iPhone messages)",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027Messages from both products present\u0027, () =\u003e {",
+                                                                                    "  pm.expect(j.items.length).to.be.at.least(3);",
+                                                                                    "  const macbookMessages = j.items.filter(msg =\u003e msg.referencedListingId == pm.environment.get(\u0027listingId\u0027));",
+                                                                                    "  const iPhoneMessages = j.items.filter(msg =\u003e msg.referencedListingId == pm.environment.get(\u0027secondListingId\u0027));",
+                                                                                    "  pm.expect(macbookMessages.length).to.be.at.least(1);",
+                                                                                    "  pm.expect(iPhoneMessages.length).to.be.at.least(1);",
+                                                                                    "});"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "auth":  {
+                                                                   "type":  "noauth"
+                                                               },
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{sellerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  "{{baseUrl}}/api/v1/conversations/{{conversationId}}/messages?limit=50"
+                                                  }
+                                  }
+                              ]
+                 },
+                 {
+                     "name":  "Uploads",
+                     "item":  [
+                                  {
+                                      "name":  "Cloudinary Listing Signature",
+                                      "description":  "Step 1 of the listing image upload flow. Returns signed params for a direct Cloudinary upload.",
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"uploadContext\": \"LISTING\",\n  \"listingId\": {{listingId}},\n  \"folder\": \"campusplug/listings/{{listingId}}\",\n  \"publicId\": \"{{listingId}}-main\",\n  \"overwrite\": false\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/uploads/cloudinary/signature"
+                                                  }
+                                  },
+                                  {
+                                      "name":  "Cloudinary Avatar Signature",
+                                      "description":  "Step 1 of the avatar upload flow. The server locks the upload path to campusplug/avatars/{userId}/profile with overwrite:true. No listingId required.",
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027200 OK\u0027, () =\u003e pm.response.to.have.status(200));",
+                                                                                    "const j = pm.response.json();",
+                                                                                    "pm.test(\u0027signature present\u0027, () =\u003e pm.expect(j.signature).to.be.a(\u0027string\u0027).and.not.empty);",
+                                                                                    "pm.test(\u0027params.public_id locked to avatars path\u0027, () =\u003e pm.expect(j.params[\u0027public_id\u0027]).to.include(\u0027campusplug/avatars/\u0027));",
+                                                                                    "if (j \u0026\u0026 j.params \u0026\u0026 j.params[\u0027public_id\u0027]) { pm.environment.set(\u0027avatarPublicId\u0027, j.params[\u0027public_id\u0027]); }"
+                                                                                ],
+                                                                       "type":  "text/javascript"
+                                                                   }
+                                                    }
+                                                ],
+                                      "request":  {
+                                                      "method":  "POST",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Content-Type",
+                                                                         "value":  "application/json"
+                                                                     }
+                                                                 ],
+                                                      "body":  {
+                                                                   "mode":  "raw",
+                                                                   "raw":  "{\n  \"uploadContext\": \"AVATAR\"\n}"
+                                                               },
+                                                      "url":  "{{baseUrl}}/api/v1/uploads/cloudinary/signature"
+                                                  }
+                                  }
+                              ]
+                 }
+             ]
 }
+
+

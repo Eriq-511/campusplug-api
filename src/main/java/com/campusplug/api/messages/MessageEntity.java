@@ -27,6 +27,10 @@ public class MessageEntity {
     @Column(name = "body", nullable = false)
     private String body;
 
+    // Optional: which listing this message is referencing (for context in unified conversations)
+    @Column(name = "referenced_listing_id")
+    private Long referencedListingId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -67,6 +71,14 @@ public class MessageEntity {
 
     public void setBody(String body) {
         this.body = body;
+    }
+
+    public Long getReferencedListingId() {
+        return referencedListingId;
+    }
+
+    public void setReferencedListingId(Long referencedListingId) {
+        this.referencedListingId = referencedListingId;
     }
 
     public Instant getCreatedAt() {

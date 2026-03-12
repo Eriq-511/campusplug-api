@@ -29,7 +29,23 @@ This folder contains importable Postman assets for testing the CampusPlug API.
 - Run **Listings → Create Listing (sets {{listingId}})** to populate `{{listingId}}`.
 - Run **Conversations → Create/Get Conversation (sets {{conversationId}})** to populate `{{conversationId}}`.
 - Run **Messages → Send Message (sets {{messageId}})** to populate `{{messageId}}`.
- For a full 2-user OTP flow, run **Conversation Flow (2-user OTP demo)** in order and set `{{sellerOtpCode}}` / `{{buyerOtpCode}}` from email before registration verify steps.
+- **New**: Messages can include `referencedListingId` to provide product context within unified conversations.
+- For a full 2-user OTP flow **with unified conversations demo**, run **Conversation Flow (2-user OTP demo)** in order and set `{{sellerOtpCode}}` / `{{buyerOtpCode}}` from email before registration verify steps.
+
+## Unified Conversations Feature
+
+**Key Behavior Change**: Users now have **one conversation thread** between them regardless of which products they discuss.
+
+- **Step 12-15** in the conversation flow demonstrate this:
+  - Alice creates a second listing (iPhone) → sets `{{secondListingId}}`
+  - Bob tries to create a conversation for the iPhone → **same conversation ID returned!**
+  - Bob sends message about iPhone with `referencedListingId: {{secondListingId}}`
+  - Final message list shows both MacBook and iPhone messages in one thread
+
+**Benefits**:
+- ✅ No duplicate chat threads per product
+- ✅ Natural conversation flow like WhatsApp/Facebook Marketplace  
+- ✅ Product context preserved via `referencedListingId` in individual messages
 
 Defaults are configured in the environment for:
 

@@ -11,13 +11,11 @@ import com.campusplug.api.messages.dto.MessageResponse;
 import com.campusplug.api.presence.PresenceService;
 import com.campusplug.api.realtime.ConversationEventsPublisher;
 import com.campusplug.api.users.UserRepository;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -49,12 +47,26 @@ public class MessageService {
     }
 
     @Transactional
-    public MessageResponse send(String email, Long conversationId, String body) {
+    public MessageResponse send(String email, Long conversationId, String body, Long referencedListingId) {
         UserRepository.UserProfileProjection me = requireUser(email);
 
         ConversationEntity conversation = conversationRepository.findParticipantConversation(conversationId, me.getId())
                 .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "NOT_PARTICIPANT", "Only conversation participants can send messages"));
 
+        // Validate referenced listing if provided
+        if (referencedListingId != null) {
+            ListingEntity referencedListing = listingRepository.findById(referencedListingId)
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Referenced listing not found"));
+
+            if (referencedListing.getStatus() == ListingStatus.SOLD) {
+                throw new ApiException(HttpStatus.CONFLICT, "LISTING_SOLD", "Cannot reference a sold listing");
+            }
+            if (referencedListing.getStatus() == ListingStatus.DELETED) {
+                throw new ApiException(HttpStatus.CONFLICT, "LISTING_UNAVAILABLE", "Cannot reference a deleted listing");
+            }
+        }
+
+        // Legacy: Also check the conversation's original listing (for backward compatibility)
         if (conversation.getListingId() != null) {
             ListingEntity listing = listingRepository.findById(conversation.getListingId())
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Listing not found"));
@@ -62,7 +74,6 @@ public class MessageService {
             if (listing.getStatus() == ListingStatus.SOLD) {
                 throw new ApiException(HttpStatus.CONFLICT, "LISTING_SOLD", "Cannot send messages for a sold listing");
             }
-            // A deleted listing is also no longer available — block new messages symmetrically
             if (listing.getStatus() == ListingStatus.DELETED) {
                 throw new ApiException(HttpStatus.CONFLICT, "LISTING_UNAVAILABLE", "Cannot send messages for a deleted listing");
             }
@@ -72,6 +83,7 @@ public class MessageService {
         msg.setConversationId(conversationId);
         msg.setSenderUserId(me.getId());
         msg.setBody(body);
+        msg.setReferencedListingId(referencedListingId);  // NEW: Set listing reference
 
         MessageEntity saved = messageRepository.save(msg);
         conversationRepository.touchUpdatedAt(conversationId);
@@ -81,6 +93,7 @@ public class MessageService {
                 saved.getConversationId(),
                 saved.getSenderUserId(),
                 saved.getBody(),
+                saved.getReferencedListingId(),  // NEW: Include in response
                 saved.getCreatedAt()
         );
 
@@ -106,10 +119,10 @@ public class MessageService {
         long deadline = System.currentTimeMillis() + timeout * 1000L;
 
         while (true) {
-            List<MessageEntity> items = messageRepository.findNewMessages(
+            List<MessageRepository.MessageRowProjection> items = messageRepository.findNewMessages(
                     conversationId,
                     afterMessageId,
-                    PageRequest.of(0, 50)
+                    50
             );
 
             if (!items.isEmpty()) {
@@ -138,10 +151,8 @@ public class MessageService {
                 .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "NOT_PARTICIPANT", "Only conversation participants can access messages"));
 
         int safeLimit = Math.min(100, Math.max(1, limit));
-        List<MessageEntity> latest = messageRepository.findLatestMessages(conversationId, PageRequest.of(0, safeLimit));
-        // repository returns desc; reverse for client readability
+        List<MessageRepository.MessageRowProjection> latest = messageRepository.findLatestMessages(conversationId, safeLimit);
         List<MessageResponse> items = new ArrayList<>(latest.stream().map(MessageService::toResponse).toList());
-        Collections.reverse(items);
         return new MessageListResponse(items);
     }
 
@@ -151,6 +162,17 @@ public class MessageService {
     }
 
     private static MessageResponse toResponse(MessageEntity e) {
-        return new MessageResponse(e.getId(), e.getConversationId(), e.getSenderUserId(), e.getBody(), e.getCreatedAt());
+        return new MessageResponse(e.getId(), e.getConversationId(), e.getSenderUserId(), e.getBody(), e.getReferencedListingId(), e.getCreatedAt());
+    }
+
+    private static MessageResponse toResponse(MessageRepository.MessageRowProjection e) {
+        return new MessageResponse(
+                e.getId(),
+                e.getConversationId(),
+                e.getSenderUserId(),
+                e.getBody(),
+                e.getReferencedListingId(),
+                e.getCreatedAt()
+        );
     }
 }
