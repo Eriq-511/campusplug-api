@@ -14,6 +14,7 @@ public record BookmarkCardResponse(
         Instant createdAt,
         String status,
         Instant bookmarkedAt,
-        Double distanceMeters
+        Double distanceMeters,
+        String ownerAvatarUrl
 ) {
 }

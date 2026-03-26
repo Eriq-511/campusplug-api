@@ -25,10 +25,12 @@ public class ListingBrowseService {
 
     private final ListingRepository listingRepository;
     private final ListingImageRepository listingImageRepository;
+    private final com.campusplug.api.users.UserRepository userRepository;
 
-    public ListingBrowseService(ListingRepository listingRepository, ListingImageRepository listingImageRepository) {
+    public ListingBrowseService(ListingRepository listingRepository, ListingImageRepository listingImageRepository, com.campusplug.api.users.UserRepository userRepository) {
         this.listingRepository = listingRepository;
         this.listingImageRepository = listingImageRepository;
+        this.userRepository = userRepository;
     }
 
     @Cacheable(cacheNames = CacheConfig.SEARCH_CACHE, keyGenerator = "searchKeyGenerator")
@@ -179,6 +181,16 @@ public class ListingBrowseService {
             .collect(Collectors.toList());
         Map<Long, String> primaryImageByListingId = loadPrimaryImages(ids);
 
+        // Collect all owner user IDs
+        List<Long> ownerUserIds = page.getContent().stream()
+            .map(ListingRepository.ListingCardProjection::getOwnerUserId)
+            .distinct()
+            .collect(Collectors.toList());
+        Map<Long, String> ownerAvatarById = new HashMap<>();
+        for (Long userId : ownerUserIds) {
+            userRepository.findPublicById(userId).ifPresent(u -> ownerAvatarById.put(userId, u.getAvatarUrl()));
+        }
+
         List<ListingCardResponse> items = page.getContent().stream()
                 .map(r -> new ListingCardResponse(
                         r.getId(),
@@ -191,7 +203,8 @@ public class ListingBrowseService {
                         primaryImageByListingId.get(r.getId()),
                         r.getCreatedAt(),
                         r.getDistanceMeters(),
-                        r.getOwnerFullName()
+                        r.getOwnerFullName(),
+                        ownerAvatarById.get(r.getOwnerUserId())
                 ))
                     .collect(Collectors.toList());
 

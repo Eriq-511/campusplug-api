@@ -1,5 +1,15 @@
 package com.campusplug.api.bookmarks;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
 import com.campusplug.api.bookmarks.dto.BookmarkCardResponse;
 import com.campusplug.api.bookmarks.dto.BookmarkPageResponse;
 import com.campusplug.api.common.ApiException;
@@ -10,15 +20,6 @@ import com.campusplug.api.listings.images.ListingImageEntity;
 import com.campusplug.api.listings.images.ListingImageRepository;
 import com.campusplug.api.users.UserEntity;
 import com.campusplug.api.users.UserRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Service
 public class BookmarkService {
@@ -68,8 +69,25 @@ public BookmarkPageResponse list(String userEmail, Double lat, Double lng, int p
         List<Long> ids = result.getContent().stream().map(BookmarkRepository.BookmarkListingProjection::getListingId).toList();
         Map<Long, String> primaryImages = loadPrimaryImages(ids);
 
+        // Collect all owner user IDs for the listings
+        List<Long> listingOwnerIds = result.getContent().stream()
+            .map(r -> {
+                ListingEntity listing = listingRepository.findById(r.getListingId()).orElse(null);
+                return listing != null ? listing.getOwnerUserId() : null;
+            })
+            .filter(id -> id != null)
+            .distinct()
+            .toList();
+        Map<Long, String> ownerAvatarById = new HashMap<>();
+        for (Long userId : listingOwnerIds) {
+            userRepository.findPublicById(userId).ifPresent(u -> ownerAvatarById.put(userId, u.getAvatarUrl()));
+        }
+
         List<BookmarkCardResponse> items = result.getContent().stream()
-                .map(r -> new BookmarkCardResponse(
+                .map(r -> {
+                    ListingEntity listing = listingRepository.findById(r.getListingId()).orElse(null);
+                    Long ownerUserId = listing != null ? listing.getOwnerUserId() : null;
+                    return new BookmarkCardResponse(
                         r.getListingId(),
                         r.getTitle(),
                         r.getPriceUgx(),
@@ -81,8 +99,10 @@ public BookmarkPageResponse list(String userEmail, Double lat, Double lng, int p
                         r.getListingCreatedAt(),
                         r.getStatus(),
                         r.getBookmarkedAt(),
-                        r.getDistanceMeters()
-                ))
+                        r.getDistanceMeters(),
+                        ownerUserId != null ? ownerAvatarById.get(ownerUserId) : null
+                    );
+                })
                 .toList();
 
         return new BookmarkPageResponse(items, pageable.getPageNumber(), pageable.getPageSize(), result.getTotalElements());
@@ -96,27 +116,34 @@ public BookmarkPageResponse list(String userEmail, Double lat, Double lng, int p
         }
     }
 
-    private BookmarkCardResponse getBookmark(Long userId, Long listingId) {
+        private BookmarkCardResponse getBookmark(Long userId, Long listingId) {
         BookmarkRepository.BookmarkListingProjection r = bookmarkRepository.findBookmark(userId, listingId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BOOKMARK_NOT_FOUND", "Bookmark not found"));
+            .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BOOKMARK_NOT_FOUND", "Bookmark not found"));
 
         Map<Long, String> primaryImages = loadPrimaryImages(List.of(listingId));
+        ListingEntity listing = listingRepository.findById(listingId).orElse(null);
+        Long ownerUserId = listing != null ? listing.getOwnerUserId() : null;
+        String ownerAvatarUrl = null;
+        if (ownerUserId != null) {
+            ownerAvatarUrl = userRepository.findPublicById(ownerUserId).map(u -> u.getAvatarUrl()).orElse(null);
+        }
 
         return new BookmarkCardResponse(
-                r.getListingId(),
-                r.getTitle(),
-                r.getPriceUgx(),
-                r.getCurrency(),
-                r.getCategoryCode(),
-                r.getLocationText(),
-                r.getCampus(),
-                primaryImages.get(listingId),
-                r.getListingCreatedAt(),
-                r.getStatus(),
-                r.getBookmarkedAt(),
-                null  // no lat/lng context on add
+            r.getListingId(),
+            r.getTitle(),
+            r.getPriceUgx(),
+            r.getCurrency(),
+            r.getCategoryCode(),
+            r.getLocationText(),
+            r.getCampus(),
+            primaryImages.get(listingId),
+            r.getListingCreatedAt(),
+            r.getStatus(),
+            r.getBookmarkedAt(),
+            null,  // no lat/lng context on add
+            ownerAvatarUrl
         );
-    }
+        }
 
     private UserEntity getUserOrThrow(String email) {
         return userRepository.findByEmailIgnoreCase(email)

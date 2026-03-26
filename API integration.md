@@ -1025,6 +1025,7 @@ No request body.
 
 ---
 
+
 ### 8.1 Full-Text Search
 
 **`GET /api/v1/listings/search`**
@@ -1057,7 +1058,8 @@ No request body.
       "primaryImageUrl": "https://res.cloudinary.com/...",
       "createdAt": "2026-03-07T10:00:00Z",
       "distanceMeters": null,
-      "ownerFullName": "Alice Nakato"
+      "ownerFullName": "Alice Nakato",
+      "ownerAvatarUrl": "https://res.cloudinary.com/.../avatar.jpg" // <-- NEW FIELD
     }
   ],
   "page": 0,
@@ -1285,6 +1287,7 @@ void onProductCardTap(BuildContext ctx, int listingId) {
 
 ---
 
+
 ### 10.1 Add Bookmark
 
 **`POST /api/v1/bookmarks`**
@@ -1310,7 +1313,8 @@ void onProductCardTap(BuildContext ctx, int listingId) {
   "createdAt": "2026-03-07T10:00:00Z",
   "status": "ACTIVE",
   "bookmarkedAt": "2026-03-07T14:30:00Z",
-  "distanceMeters": null
+  "distanceMeters": null,
+  "ownerAvatarUrl": "https://res.cloudinary.com/.../avatar.jpg" // <-- NEW FIELD
 }
 ```
 
@@ -2245,6 +2249,7 @@ class ConfirmAvatarRequest {
   };
 }
 
+
 // ─────────────────────────────────────────────────────
 // LISTINGS
 // ─────────────────────────────────────────────────────
@@ -2331,11 +2336,12 @@ class ListingCardResponse {
   final DateTime createdAt;
   final double? distanceMeters;
   final String? ownerFullName;
+  final String? ownerAvatarUrl; // <-- NEW FIELD
 
   const ListingCardResponse({required this.id, required this.title,
     required this.priceUgx, required this.currency, required this.categoryCode,
     this.locationText, this.campus, this.primaryImageUrl, required this.createdAt,
-    this.distanceMeters, this.ownerFullName});
+    this.distanceMeters, this.ownerFullName, this.ownerAvatarUrl});
 
   factory ListingCardResponse.fromJson(Map<String, dynamic> j) =>
       ListingCardResponse(
@@ -2346,6 +2352,7 @@ class ListingCardResponse {
         createdAt: DateTime.parse(j['createdAt']),
         distanceMeters: j['distanceMeters']?.toDouble(),
         ownerFullName: j['ownerFullName'],
+        ownerAvatarUrl: j['ownerAvatarUrl'],
       );
 }
 
@@ -2401,11 +2408,12 @@ class BookmarkCardResponse {
   final String status;
   final DateTime bookmarkedAt;
   final double? distanceMeters;
+  final String? ownerAvatarUrl; // <-- NEW FIELD
 
   const BookmarkCardResponse({required this.id, required this.title,
     required this.priceUgx, required this.currency, required this.categoryCode,
     this.locationText, this.campus, this.primaryImageUrl, required this.createdAt,
-    required this.status, required this.bookmarkedAt, this.distanceMeters});
+    required this.status, required this.bookmarkedAt, this.distanceMeters, this.ownerAvatarUrl});
 
   factory BookmarkCardResponse.fromJson(Map<String, dynamic> j) =>
       BookmarkCardResponse(
@@ -2416,6 +2424,7 @@ class BookmarkCardResponse {
         createdAt: DateTime.parse(j['createdAt']),
         status: j['status'], bookmarkedAt: DateTime.parse(j['bookmarkedAt']),
         distanceMeters: j['distanceMeters']?.toDouble(),
+        ownerAvatarUrl: j['ownerAvatarUrl'],
       );
 }
 
