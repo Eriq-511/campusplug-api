@@ -1603,6 +1603,40 @@ Future<List<MessageResponse>> longPollMessages(int conversationId, int afterMess
 
 ---
 
+### 12.4 Fetch Unread Summary
+
+**`GET /api/v1/conversations/{conversationId}/messages/unread-summary`**
+
+- Returns the count of conversations with unread messages for the authenticated user.
+- **Response:**
+  - `200 OK`: Integer (number of conversations with unread messages)
+
+---
+
+### 12.5 Mark Messages as Read
+
+**`PATCH /api/v1/conversations/{conversationId}/messages/mark-as-read`**
+
+- Marks all messages in the conversation as read for the authenticated user.
+- **Response:**
+  - `200 OK`: No content
+
+---
+
+### 12.6 Presence Heartbeat
+
+**`POST /api/v1/conversations/{conversationId}/messages/presence/heartbeat`**
+
+- Updates the user's presence (online status). Call this periodically (e.g., every 30 seconds) while the user is active in the app.
+- **Response:**
+  - `200 OK`: No content
+
+---
+
+> All endpoints require authentication. Use these endpoints to support in-app message notifications, unread badges, and real-time presence in the frontend.
+
+---
+
 ## 13. Image Uploads (Cloudinary)
 
 > Uploads go **directly to Cloudinary** from the app — never through the backend server.  
@@ -2914,10 +2948,10 @@ Alice and Bob each establish a STOMP connection using their respective tokens (s
     },
     {
       "id": 51,
-      "body": "Yes, it's still available! When would you like to see it?",
+      "body": "Yes, still available! When can you come?",
       "referencedListingId": 10,
       "senderUserId": 1,
-      "createdAt": "2026-03-07T10:08:00Z"
+      "createdAt": "2026-03-07T10:07:00Z"
     },
     {
       "id": 52,

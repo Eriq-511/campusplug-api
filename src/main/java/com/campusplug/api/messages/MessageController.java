@@ -13,6 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+
 @RestController
 @RequestMapping({"/api/v1/conversations/{conversationId}/messages", "/conversations/{conversationId}/messages"})
 public class MessageController {
@@ -21,6 +25,34 @@ public class MessageController {
 
     public MessageController(MessageService messageService) {
         this.messageService = messageService;
+    }
+
+    /**
+     * Endpoint to fetch unread message summary for the authenticated user.
+     * Returns the count of conversations with unread messages.
+     */
+    @GetMapping("/unread-summary")
+    public ResponseEntity<Integer> getUnreadSummary(Authentication authentication) {
+        int unreadCount = messageService.getUnreadConversationsCount(authentication.getName());
+        return ResponseEntity.ok(unreadCount);
+    }
+
+    /**
+     * Endpoint to mark all messages in a conversation as read for the user.
+     */
+    @PatchMapping("/mark-as-read")
+    public ResponseEntity<Void> markAsRead(Authentication authentication, @PathVariable("conversationId") Long conversationId) {
+        messageService.markAsRead(authentication.getName(), conversationId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Optional: Heartbeat endpoint for presence (to keep user online status active).
+     */
+    @PostMapping("/presence/heartbeat")
+    public ResponseEntity<Void> heartbeat(Authentication authentication) {
+        messageService.heartbeat(authentication.getName());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping

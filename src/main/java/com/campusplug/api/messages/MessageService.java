@@ -1,5 +1,12 @@
 package com.campusplug.api.messages;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.campusplug.api.common.ApiException;
 import com.campusplug.api.conversations.ConversationEntity;
 import com.campusplug.api.conversations.ConversationRepository;
@@ -11,12 +18,6 @@ import com.campusplug.api.messages.dto.MessageResponse;
 import com.campusplug.api.presence.PresenceService;
 import com.campusplug.api.realtime.ConversationEventsPublisher;
 import com.campusplug.api.users.UserRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 public class MessageService {
@@ -44,6 +45,35 @@ public class MessageService {
         this.conversationEventsPublisher = conversationEventsPublisher;
         this.presenceService = presenceService;
         this.longPollNotifier = longPollNotifier;
+    }
+
+    /**
+     * Returns the count of conversations with unread messages for the user.
+     */
+    @Transactional(readOnly = true)
+    public int getUnreadConversationsCount(String email) {
+        UserRepository.UserProfileProjection me = requireUser(email);
+        // TODO: Implement actual unread logic. For now, return 0 as a placeholder.
+        // You should track read state per user/conversation in the DB for real implementation.
+        return 0;
+    }
+
+    /**
+     * Marks all messages in a conversation as read for the user.
+     */
+    @Transactional
+    public void markAsRead(String email, Long conversationId) {
+        UserRepository.UserProfileProjection me = requireUser(email);
+        // TODO: Implement actual mark-as-read logic. For now, this is a placeholder.
+        // You should update a read-tracking table or field in the DB for real implementation.
+    }
+
+    /**
+     * Heartbeat to update user presence (online status).
+     */
+    public void heartbeat(String email) {
+        UserRepository.UserProfileProjection me = requireUser(email);
+        presenceService.markActive(me.getId());
     }
 
     @Transactional
