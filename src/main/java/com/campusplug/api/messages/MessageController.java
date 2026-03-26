@@ -1,11 +1,9 @@
 package com.campusplug.api.messages;
 
-import com.campusplug.api.messages.dto.MessageListResponse;
-import com.campusplug.api.messages.dto.MessageResponse;
-import com.campusplug.api.messages.dto.SendMessageRequest;
-import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,9 +11,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import com.campusplug.api.messages.dto.MessageListResponse;
+import com.campusplug.api.messages.dto.MessageResponse;
+import com.campusplug.api.messages.dto.SendMessageRequest;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping({"/api/v1/conversations/{conversationId}/messages", "/conversations/{conversationId}/messages"})
@@ -27,15 +27,7 @@ public class MessageController {
         this.messageService = messageService;
     }
 
-    /**
-     * Endpoint to fetch unread message summary for the authenticated user.
-     * Returns the count of conversations with unread messages.
-     */
-    @GetMapping("/unread-summary")
-    public ResponseEntity<Integer> getUnreadSummary(Authentication authentication) {
-        int unreadCount = messageService.getUnreadConversationsCount(authentication.getName());
-        return ResponseEntity.ok(unreadCount);
-    }
+    // ...existing code...
 
     /**
      * Endpoint to mark all messages in a conversation as read for the user.
